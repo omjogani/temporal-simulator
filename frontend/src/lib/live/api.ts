@@ -23,6 +23,7 @@ export const api = {
   payments: (mode: "down" | "slow") => post("/api/payments", { mode }),
   load: (kind: "flood" | "bulk" | "declined") => post("/api/load", { kind }),
   sched: (mode: "fifo" | "priority" | "fair") => post("/api/sched", { mode }),
+  speed: (speed: number) => post("/api/speed", { speed }),
   pause: (id = "") => post("/api/pause", { id }),
   resume: (id = "") => post("/api/resume", { id }),
 };

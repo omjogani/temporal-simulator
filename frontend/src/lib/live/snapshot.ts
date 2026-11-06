@@ -52,5 +52,6 @@ export interface Snapshot {
   banner: { seq: number; text: string };
   retry: { initialMs: number; coefficient: number; maxMs: number; maxAttempts: number };
   startToCloseMs: number;
+  speed: number;
   temporalUi: string;
 }

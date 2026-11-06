@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Tag, UrlPill } from "@/components/atoms";
+import { SpeedSlider } from "@/components/molecules";
 import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepRail, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { api } from "@/lib/live/api";
@@ -13,6 +14,7 @@ import { QueueSim, simConfigFor } from "@/lib/sim/engine";
 import { STEPS, getStep } from "@/lib/steps";
 import type { ActionId, ArenaView, NodeId, SchedMode, ToolId } from "@/lib/types";
 import { useFrameLoop } from "@/lib/useFrameLoop";
+import { SPEED_STOPS, nudgeSpeed, setSpeed, useSpeed } from "@/lib/speed";
 import styles from "./SimulatorPage.module.css";
 
 const BANNER_MS = 7000;
@@ -32,8 +34,15 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   // Act 2: live snapshots from the Go controller (real Temporal).
   const live = useLive(step.id, step.live);
 
+  // Speed: scales the simulation clock (Act 1), the board animation, and on
+  // live steps the real activity durations and client pace in the controller.
+  const speed = useSpeed();
+  useEffect(() => {
+    if (step.live) void api.speed(speed);
+  }, [speed, step.live]);
+
   const { now, wall } = useFrameLoop((dt) => {
-    if (sim && !frozen) sim.tick(dt);
+    if (sim && !frozen) sim.tick(dt * speed);
   });
   const place = useDotMotion();
 
@@ -44,7 +53,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     view = liveView(live.snapshot, step, serverNow, sparkViews(live.sparks, serverNow), live.connected);
   } else view = emptyLiveView(step, live.connected);
 
-  const dots = place(view.dots, now);
+  const dots = place(view.dots, now, speed);
 
   // Show each banner for a few seconds.
   if (view.banner.seq !== banner.seq && view.banner.text) setBanner({ seq: view.banner.seq, at: now });
@@ -91,6 +100,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement) return; // e.g. arrow keys on the speed slider
       const k = e.key.toLowerCase();
       const has = (a: ActionId) => step.actions.includes(a);
       if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
@@ -105,6 +115,8 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
       else if (k === "r") action("reset");
+      else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
+      else if (e.key === "=" || e.key === "+") nudgeSpeed(1);
       else if (e.key === " " && !step.live) {
         e.preventDefault();
         setFrozen((f) => !f);
@@ -126,6 +138,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           </a>
         ) : undefined
       }
+      speed={<SpeedSlider value={speed} stops={SPEED_STOPS} onChange={setSpeed} />}
       toolbox={
         <Toolbox
           step={step}

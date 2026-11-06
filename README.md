@@ -25,6 +25,11 @@ make dev    # Go controller on :18080 (spawns 4 workers) + Next.js on :13000
 
 Open <http://localhost:13000/1>. Use ← → to move between steps.
 
+The **Speed** slider (or `-` / `+`) runs everything from 0.25× to 2×. On `/1`–`/2` it scales
+the simulation clock. On `/3`–`/6` the controller scales real activity durations, client pace,
+the start-to-close timeout and the slow-Payments delay for new orders. Hammer outages (10 s)
+and the retry backoff (1→2→4→8 s) stay in real seconds.
+
 ## How it works
 
 ```

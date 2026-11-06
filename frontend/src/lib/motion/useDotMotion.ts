@@ -39,8 +39,8 @@ export function useDotMotion() {
   const store = useRef(new Map<string, Motion>());
   const last = useRef(0);
 
-  return (dots: DotView[], now: number): PlacedDot[] => {
-    const dt = last.current ? Math.min(64, now - last.current) : 16;
+  return (dots: DotView[], now: number, speed = 1): PlacedDot[] => {
+    const dt = (last.current ? Math.min(64, now - last.current) : 16) * speed;
     last.current = now;
     const map = store.current;
     const seen = new Set<string>();
@@ -62,7 +62,7 @@ export function useDotMotion() {
           m.pendingKey = key;
           m.pendingSince = now;
         }
-        travel = now - (m.pendingSince ?? now) >= LINGER_MS;
+        travel = now - (m.pendingSince ?? now) >= LINGER_MS / speed;
       } else if (m.key === key) {
         m.pendingKey = undefined;
       }
@@ -73,7 +73,7 @@ export function useDotMotion() {
         const path = mkPath([[m.x, m.y], ...route]);
         m.path = path;
         m.t0 = now;
-        m.dur = Math.max(200, Math.min(1000, path.len / SPEED));
+        m.dur = Math.max(200, Math.min(1000, path.len / SPEED)) / speed;
         m.key = key;
         m.loc = dot.loc;
       } else if (lingering) {
@@ -102,7 +102,7 @@ export function useDotMotion() {
       if (dot.fate) {
         if (m.fadeT0 === undefined) m.fadeT0 = now;
         const age = now - m.fadeT0;
-        opacity *= Math.max(0, 1 - age / (dot.fate === "lost" ? 1100 : 800));
+        opacity *= Math.max(0, 1 - (age * speed) / (dot.fate === "lost" ? 1100 : 800));
         if (dot.fate === "lost") m.y += dt * 0.06;
       }
       out.push({ dot, x: m.x, y: m.y, opacity });

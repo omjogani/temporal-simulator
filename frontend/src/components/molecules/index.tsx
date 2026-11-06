@@ -24,6 +24,28 @@ export function SegmentedControl<T extends string>({ label, options, value, onCh
   );
 }
 
+/** Visualization speed: a stepped range input with the current value. */
+export function SpeedSlider({ value, stops, onChange }: { value: number; stops: readonly number[]; onChange: (v: number) => void }) {
+  const index = Math.max(0, stops.indexOf(value));
+  return (
+    <label className={styles.speed}>
+      <span>Speed</span>
+      <input
+        id="speed"
+        type="range"
+        min={0}
+        max={stops.length - 1}
+        step={1}
+        value={index}
+        aria-valuetext={`${value}x`}
+        onChange={(e) => onChange(stops[Number(e.target.value)])}
+      />
+      <output htmlFor="speed">{value}×</output>
+      <Kbd>- / +</Kbd>
+    </label>
+  );
+}
+
 export function WorkerRow({ row }: { row: WorkerRowView }) {
   return (
     <div className={styles.workerRow}>

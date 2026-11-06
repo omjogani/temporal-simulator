@@ -6,6 +6,7 @@ interface Props {
   title: string;
   tag: ReactNode;
   extra?: ReactNode;
+  speed?: ReactNode;
   toolbox: ReactNode;
   left: ReactNode;
   board: ReactNode;
@@ -17,7 +18,7 @@ interface Props {
 }
 
 /** Page layout of the simulator: top bar, panel | board | panel, caption, step rail. */
-export function ArenaTemplate({ url, title, tag, extra, toolbox, left, board, overlay, right, caption, banner, rail }: Props) {
+export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner, rail }: Props) {
   return (
     <main className={styles.arena}>
       <header className={styles.top}>
@@ -25,7 +26,10 @@ export function ArenaTemplate({ url, title, tag, extra, toolbox, left, board, ov
         <h1 className={styles.title}>{title}</h1>
         {tag}
         {extra}
-        <div className={styles.tools}>{toolbox}</div>
+        <div className={styles.tools}>
+          {speed}
+          {toolbox}
+        </div>
       </header>
       <div className={styles.grid}>
         <div className={styles.left}>{left}</div>

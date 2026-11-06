@@ -147,3 +147,25 @@
   outline: 2px solid var(--c-gold);
   outline-offset: 2px;
 }
+
+.speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 var(--fs-sm) / 1 var(--font-mono);
+  color: var(--c-dim);
+  padding: 4px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  background: var(--c-panel);
+}
+.speed input {
+  width: 110px;
+  accent-color: var(--c-gold);
+  cursor: pointer;
+}
+.speed output {
+  min-width: 3.4em;
+  color: var(--c-gold);
+  font-variant-numeric: tabular-nums;
+}
