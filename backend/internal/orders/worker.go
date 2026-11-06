@@ -2,7 +2,6 @@ package orders
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -17,7 +16,7 @@ import (
 // until the process is killed. Each worker executes one activity at a time so the
 // UI can show exactly one order per worker card.
 func RunWorker(id int, hostPort, controllerURL string) error {
-	identity := fmt.Sprintf("worker-%d", id)
+	identity := ContainerName(id)
 	c, err := tclient.DialWithRetry(context.Background(), hostPort, identity)
 	if err != nil {
 		return err

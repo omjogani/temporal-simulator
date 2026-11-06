@@ -1,4 +1,4 @@
-// Package controller runs the demo: it owns the worker processes, can kill the
+// Package controller runs the demo: it starts and kills the worker containers, can kill the
 // Temporal container, hosts a fake Payments API, generates client load and
 // streams a state snapshot to the browser.
 package controller
@@ -33,7 +33,6 @@ type Config struct {
 	TemporalHostPort string
 	Container        string
 	TemporalUI       string
-	Exe              string // path to this binary, used to spawn workers
 }
 
 // Controller holds all demo state. Fields below mu are guarded by it.
@@ -100,6 +99,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	for i := 1; i <= numWorkers; i++ {
 		c.startWorker(i)
 	}
+	go c.dockerWatchLoop(ctx.Done())
 	go c.healthLoop(ctx)
 	go c.pollLoop(ctx)
 	go c.starterLoop(ctx)
@@ -114,8 +114,8 @@ func (c *Controller) Run(ctx context.Context) error {
 		_ = srv.Shutdown(shut)
 	}()
 	log.Printf("controller listening on http://localhost:%d (Temporal %s, UI %s)", c.cfg.Port, c.cfg.TemporalHostPort, c.cfg.TemporalUI)
+	// Worker containers keep running when the controller stops; `make down` stops them.
 	err = srv.Serve(ln)
-	c.stopAllWorkers()
 	if err == http.ErrServerClosed {
 		return nil
 	}
@@ -196,14 +196,13 @@ func (c *Controller) SetStep(n int, force bool) {
 
 	go c.terminateRunning(context.Background())
 	if live {
-		// Fresh workers so nothing from the previous step lingers in their caches.
-		for i := 1; i <= numWorkers; i++ {
-			c.killWorker(i, 0)
-			c.startWorker(i)
-		}
-		for cl := 0; cl < 4; cl++ {
-			go c.clientLoop(loadCtx, cl)
-		}
+		// Fresh worker containers so nothing from the previous step lingers in their caches.
+		go func() {
+			c.restartAllWorkers()
+			for cl := 0; cl < 4; cl++ {
+				go c.clientLoop(loadCtx, cl)
+			}
+		}()
 	}
 }
 

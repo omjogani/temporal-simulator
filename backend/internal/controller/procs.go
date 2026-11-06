@@ -1,72 +1,50 @@
 package controller
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"log"
 	"os/exec"
-	"strconv"
-	"syscall"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/omjogani/temporal-simulator/backend/internal/orders"
 )
 
-// workerProc is one real worker OS process.
+// workerProc is one real worker, running in its own Docker container
+// (worker-biscuit, worker-mochi, …) so the audience can watch it die in Docker Desktop.
 type workerProc struct {
 	id        int
-	cmd       *exec.Cmd
 	up        bool
 	gen       int // bumps on every start/kill so stale callbacks can tell
 	downUntil time.Time
 	completed int
 }
 
-// startWorker spawns `sim worker --id N`.
+func containerOf(id int) string { return orders.ContainerName(id) }
+
+// startWorker runs `docker start` on the worker's container.
 func (c *Controller) startWorker(id int) {
-	cmd := exec.Command(c.cfg.Exe, "worker",
-		"--id", strconv.Itoa(id),
-		"--temporal", c.cfg.TemporalHostPort,
-		"--controller", c.selfURL)
-	out := prefixWriter(fmt.Sprintf("[worker-%d] ", id))
-	cmd.Stdout, cmd.Stderr = out, out
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
-		log.Printf("start worker %d: %v", id, err)
+	if err := docker("start", containerOf(id)); err != nil {
+		log.Printf("start %s (run `make up` to create the worker containers): %v", containerOf(id), err)
 		return
 	}
-
 	c.mu.Lock()
 	w := c.workers[id]
 	w.gen++
-	gen := w.gen
-	w.cmd, w.up, w.downUntil = cmd, true, time.Time{}
+	w.up, w.downUntil = true, time.Time{}
 	c.mu.Unlock()
-
-	go func() {
-		_ = cmd.Wait()
-		c.mu.Lock()
-		if w.gen == gen && w.up { // exited on its own
-			w.up = false
-			c.markInterrupted(id)
-			log.Printf("worker %d exited", id)
-		}
-		c.mu.Unlock()
-	}()
 }
 
-// killWorker SIGKILLs a worker. With downFor > 0 it comes back after that long.
+// killWorker runs `docker kill` (SIGKILL) on the worker's container.
+// With downFor > 0 it is started again after that long.
 func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 	c.mu.Lock()
 	w := c.workers[id]
-	if !w.up || w.cmd == nil {
+	if !w.up {
 		c.mu.Unlock()
 		return false
 	}
-	cmd := w.cmd
 	w.up = false
-	w.cmd = nil
 	w.gen++
 	gen := w.gen
 	if downFor > 0 {
@@ -75,7 +53,9 @@ func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 	}
 	c.mu.Unlock()
 
-	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	if err := docker("kill", containerOf(id)); err != nil {
+		log.Printf("kill %s: %v", containerOf(id), err)
+	}
 
 	if downFor > 0 {
 		time.AfterFunc(downFor, func() {
@@ -90,6 +70,84 @@ func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 	return true
 }
 
+// restartAllWorkers gives every worker a fresh process (empty workflow cache)
+// when a step starts. The four containers restart in parallel.
+func (c *Controller) restartAllWorkers() {
+	var wg sync.WaitGroup
+	for i := 1; i <= numWorkers; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			c.mu.Lock()
+			w := c.workers[id]
+			w.gen++
+			w.up = false
+			c.mu.Unlock()
+			if err := docker("restart", "--time", "0", containerOf(id)); err != nil {
+				log.Printf("restart %s: %v", containerOf(id), err)
+				return
+			}
+			c.mu.Lock()
+			w.gen++
+			w.up, w.downUntil = true, time.Time{}
+			c.mu.Unlock()
+		}(i)
+	}
+	wg.Wait()
+}
+
+// dockerWatchLoop keeps worker state in sync with Docker, so stopping or
+// starting a worker from Docker Desktop shows up on the board too.
+func (c *Controller) dockerWatchLoop(stop <-chan struct{}) {
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	names := make([]string, 0, numWorkers)
+	for i := 1; i <= numWorkers; i++ {
+		names = append(names, containerOf(i))
+	}
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+		args := append([]string{"inspect", "-f", "{{.Name}} {{.State.Running}}"}, names...)
+		out, _ := exec.Command("docker", args...).Output()
+		running := map[string]bool{}
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			f := strings.Fields(line)
+			if len(f) == 2 {
+				running[strings.TrimPrefix(f[0], "/")] = f[1] == "true"
+			}
+		}
+		c.mu.Lock()
+		for i := 1; i <= numWorkers; i++ {
+			w := c.workers[i]
+			r, known := running[containerOf(i)]
+			if !known {
+				continue
+			}
+			switch {
+			case w.up && !r: // stopped outside the controller (Docker Desktop, crash)
+				w.up = false
+				w.gen++
+				c.markInterrupted(i)
+				c.say("%s (%s) stopped outside the simulator.", orders.WorkerName(i), containerOf(i))
+			case !w.up && r && !c.restarting(i): // started from Docker Desktop, or restart finished
+				w.up = true
+				w.gen++
+				w.downUntil = time.Time{}
+			}
+		}
+		c.mu.Unlock()
+	}
+}
+
+// restarting reports whether a hammer or restart for this worker is in progress. Caller holds mu.
+func (c *Controller) restarting(id int) bool {
+	return time.Now().Before(c.workers[id].downUntil)
+}
+
 // markInterrupted flags orders whose activity was running on a dead worker.
 // Temporal will notice through the heartbeat timeout and retry elsewhere.
 // Caller holds mu.
@@ -101,12 +159,6 @@ func (c *Controller) markInterrupted(id int) {
 			st.State = stInterrupted
 			st.NextRetryAt = unixMs(time.Now().Add(time.Duration(c.step.HeartbeatMs)*time.Millisecond + c.step.Retry.Backoff(st.Attempt)))
 		}
-	}
-}
-
-func (c *Controller) stopAllWorkers() {
-	for i := 1; i <= numWorkers; i++ {
-		c.killWorker(i, 0)
 	}
 }
 
@@ -125,16 +177,4 @@ func stepName(i int) string {
 		return orders.StepNames[i]
 	}
 	return "?"
-}
-
-// prefixWriter tags each line of a child's output.
-func prefixWriter(prefix string) io.Writer {
-	pr, pw := io.Pipe()
-	go func() {
-		sc := bufio.NewScanner(pr)
-		for sc.Scan() {
-			log.Print(prefix + sc.Text())
-		}
-	}()
-	return pw
 }

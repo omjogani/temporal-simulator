@@ -124,7 +124,7 @@ func (c *Controller) routes() http.Handler {
 
 // ---------- actions ----------
 
-// HammerWorker kills one worker process for HammerDuration.
+// HammerWorker kills one worker container for HammerDuration.
 func (c *Controller) HammerWorker(id int) {
 	if id < 1 || id > numWorkers {
 		return
@@ -141,10 +141,10 @@ func (c *Controller) HammerWorker(id int) {
 				done++
 			}
 		}
-		c.say("Worker %d killed (SIGKILL) during %s. Order #%d keeps its %d recorded steps; Temporal retries %s on a healthy worker after the heartbeat timeout.",
-			id, stepName(o.Current), o.Num, done, stepName(o.Current))
+		c.say("docker kill %s: %s died during %s. Order #%d keeps its %d recorded steps; Temporal retries %s on a healthy worker after the heartbeat timeout.",
+			containerOf(id), orders.WorkerName(id), stepName(o.Current), o.Num, done, stepName(o.Current))
 	} else {
-		c.say("Worker %d killed (SIGKILL) while idle. It restarts in 10 s.", id)
+		c.say("docker kill %s: %s died while idle. It starts again in 10 s.", containerOf(id), orders.WorkerName(id))
 	}
 }
 
@@ -154,7 +154,7 @@ func (c *Controller) HammerAllWorkers() {
 		c.killWorker(i, HammerDuration)
 	}
 	c.mu.Lock()
-	c.say("All 4 workers killed. Orders wait in Temporal with their progress and continue when workers return in 10 s.")
+	c.say("docker kill on all 4 worker containers. Orders wait in Temporal with their progress and continue when workers return in 10 s.")
 	c.mu.Unlock()
 }
 

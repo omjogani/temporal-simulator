@@ -19,8 +19,8 @@ take the Payments API down, flood the system. The scoreboards show what survives
 Requirements: Docker, Go 1.24+, Node 20+ with pnpm.
 
 ```bash
-make up     # Temporal dev server in Docker: gRPC :17233, Web UI http://localhost:18233
-make dev    # Go controller on :18080 (spawns 4 workers) + Next.js on :13000
+make up     # Temporal + 4 worker containers in Docker: gRPC :17233, Web UI http://localhost:18233
+make dev    # Go controller on :18080 (drives the workers) + Next.js on :13000
 ```
 
 Open <http://localhost:13000/1>. Use ← → to move between steps.
@@ -34,14 +34,15 @@ backoff (1→2→4→8 s).
 ## How it works
 
 ```
-Browser (Next.js) ──WebSocket──▶ Go controller ──spawns/kills──▶ 4 worker processes
+Browser (Next.js) ──WebSocket──▶ Go controller ──docker kill/start──▶ 4 worker containers
       ▲                              │  │                              │
       └──── snapshot 10×/s ──────────┘  └─ docker kill/start ─▶ Temporal (Docker)
                                          fake Payments API ◀── Charge card activity
 ```
 
-- **Workers** are real OS processes running the Temporal Go SDK, one activity at a time.
-  The hammer is a real `SIGKILL`; they come back after 10 s.
+- **Workers** are four Docker containers (`worker-biscuit`, `worker-mochi`, `worker-pepper`,
+  `worker-noodle`) running the Temporal Go SDK, one activity at a time. The hammer is a real
+  `docker kill`, so you can watch the container exit in Docker Desktop; it starts again after 10 s.
 - **Hammering Temporal** runs `docker kill` on the `temporal-sim` container and starts it again
   10 s later. History survives because the dev server stores it in SQLite on a volume.
 - **Ticks on the worker to-do lists come from Temporal**: the workflow publishes its progress

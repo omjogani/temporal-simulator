@@ -1,8 +1,8 @@
 # Temporal Chaos Simulator
 .PHONY: up down reset-temporal backend frontend dev build check
 
-up: ## Start Temporal (Docker) on :17233, Web UI on :18233
-	docker compose up -d
+up: ## Start Temporal and the 4 worker containers (Docker); gRPC :17233, Web UI :18233
+	docker compose up -d --build
 
 down: ## Stop Temporal (keeps its data volume)
 	docker compose down
@@ -10,7 +10,7 @@ down: ## Stop Temporal (keeps its data volume)
 reset-temporal: ## Stop Temporal and wipe its history
 	docker compose down -v
 
-backend: ## Run the Go controller on :18080 (it spawns the 4 workers)
+backend: ## Run the Go controller on :18080 (it starts/kills the worker containers)
 	cd backend && go build -o bin/sim ./cmd/sim && ./bin/sim controller
 
 frontend: ## Run the Next.js app on :13000

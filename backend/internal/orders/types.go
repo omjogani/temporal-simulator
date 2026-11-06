@@ -2,7 +2,11 @@
 // between the controller and the worker processes.
 package orders
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 const (
 	// TaskQueue is the single task queue every worker polls.
@@ -91,4 +95,21 @@ type Event struct {
 	DurationMs int    `json:"durationMs"`
 	Error      string `json:"error,omitempty"`
 	ErrorType  string `json:"errorType,omitempty"`
+}
+
+// WorkerNames are the pet names of the four workers (index = worker id, 1-based).
+// Each one runs in its own Docker container named ContainerName(id).
+var WorkerNames = [...]string{"", "Biscuit", "Mochi", "Pepper", "Noodle"}
+
+// WorkerName returns the pet name for a worker id.
+func WorkerName(id int) string {
+	if id > 0 && id < len(WorkerNames) {
+		return WorkerNames[id]
+	}
+	return fmt.Sprintf("Worker %d", id)
+}
+
+// ContainerName is the Docker container a worker runs in, e.g. "worker-biscuit".
+func ContainerName(id int) string {
+	return "worker-" + strings.ToLower(WorkerName(id))
 }

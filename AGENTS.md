@@ -34,7 +34,7 @@ backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
   internal/steps/         per-step config for the live steps (3-6)
-  internal/controller/    HTTP + WebSocket API, worker process manager, docker hammer,
+  internal/controller/    HTTP + WebSocket API, worker container manager, docker hammer,
                           fake Payments API, client load generator, state registry
 frontend/                 Next.js (App Router, TypeScript), atomic design
   src/components/atoms|molecules|organisms|templates
@@ -44,8 +44,13 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 
 ## How the live steps work
 
-- `sim controller` (port 18080) spawns 4 real worker processes (`sim worker --id 1..4`).
-  Hammering a worker is a real SIGKILL; it is restarted after 10 s.
+- The 4 workers run in Docker as `worker-biscuit`, `worker-mochi`, `worker-pepper` and
+  `worker-noodle` (pet names: Biscuit, Mochi, Pepper, Noodle; same `sim worker` binary, image
+  built from `backend/Dockerfile`). `sim controller` (port 18080, on the host) hammers a worker
+  with `docker kill` and runs `docker start` after 10 s, so the presenter can show it in Docker
+  Desktop. It also polls `docker inspect`, so stopping a worker in Docker Desktop shows on the board.
+  Workers reach the controller at `host.docker.internal:18080`. Names live in
+  `backend/internal/orders/types.go` and `frontend/src/lib/steps.ts`; keep them in sync.
 - Hammering Temporal runs `docker kill temporal-sim`, then `docker start temporal-sim` after 10 s.
   History survives because the dev server uses a SQLite file on a named volume.
 - Each worker runs one activity at a time (`MaxConcurrentActivityExecutionSize: 1`) so a
@@ -70,7 +75,7 @@ This machine also runs **other projects**: a separate Temporal setup (containers
 | Go controller (HTTP + WS) | `18080` |
 | Next.js dev server | `13000` |
 
-Only ever hammer / kill the `temporal-sim` container.
+Only ever hammer / kill the `temporal-sim` and `worker-*` containers from this compose file.
 
 ## Commands
 

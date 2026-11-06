@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/omjogani/temporal-simulator/backend/internal/controller"
@@ -45,12 +46,8 @@ func runController(args []string) {
 	ui := fs.String("ui", "http://localhost:18233", "Temporal Web UI URL shown in the app")
 	_ = fs.Parse(args)
 
-	exe, err := os.Executable()
-	if err != nil {
-		log.Fatal(err)
-	}
 	c, err := controller.New(controller.Config{
-		Port: *port, TemporalHostPort: *temporal, Container: *container, TemporalUI: *ui, Exe: exe,
+		Port: *port, TemporalHostPort: *temporal, Container: *container, TemporalUI: *ui,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -64,13 +61,20 @@ func runController(args []string) {
 
 func runWorker(args []string) {
 	fs := flag.NewFlagSet("worker", flag.ExitOnError)
-	id := fs.Int("id", 1, "worker number (1-4)")
+	id := fs.Int("id", envInt("WORKER_ID", 1), "worker number (1-4)")
 	temporal := fs.String("temporal", envOr("TEMPORAL_ADDRESS", "localhost:17233"), "Temporal gRPC host:port")
-	ctrl := fs.String("controller", "http://127.0.0.1:18080", "controller base URL (events + Payments API)")
+	ctrl := fs.String("controller", envOr("CONTROLLER_URL", "http://127.0.0.1:18080"), "controller base URL (events + Payments API)")
 	_ = fs.Parse(args)
 	if err := orders.RunWorker(*id, *temporal, *ctrl); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func envInt(k string, def int) int {
+	if n, err := strconv.Atoi(os.Getenv(k)); err == nil {
+		return n
+	}
+	return def
 }
 
 func envOr(k, def string) string {

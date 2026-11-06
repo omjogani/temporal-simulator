@@ -1,4 +1,4 @@
-# Local Temporal for the simulator.
+# Local Temporal and the four workers for the simulator.
 # Dev server with a SQLite file on a named volume, so killing and restarting the
 # container (the "hammer Temporal" tool) keeps every workflow and its history.
 #
@@ -30,6 +30,44 @@ services:
     command: ["sh", "-c", "chown -R 1000:1000 /data"]
     volumes:
       - temporal-data:/data
+
+  # The four workers, one container each, named so they are easy to spot in Docker
+  # Desktop. The controller (on the host) hammers them with `docker kill` and brings
+  # them back with `docker start`; restart is "no" so Docker never does it for us.
+  worker-biscuit: &worker
+    build: ./backend
+    image: temporal-sim-worker:dev
+    container_name: worker-biscuit
+    environment:
+      WORKER_ID: "1"
+      TEMPORAL_ADDRESS: temporal:7233
+      CONTROLLER_URL: http://host.docker.internal:18080   # events + fake Payments API
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+    depends_on:
+      - temporal
+  worker-mochi:
+    <<: *worker
+    container_name: worker-mochi
+    environment:
+      WORKER_ID: "2"
+      TEMPORAL_ADDRESS: temporal:7233
+      CONTROLLER_URL: http://host.docker.internal:18080
+  worker-pepper:
+    <<: *worker
+    container_name: worker-pepper
+    environment:
+      WORKER_ID: "3"
+      TEMPORAL_ADDRESS: temporal:7233
+      CONTROLLER_URL: http://host.docker.internal:18080
+  worker-noodle:
+    <<: *worker
+    container_name: worker-noodle
+    environment:
+      WORKER_ID: "4"
+      TEMPORAL_ADDRESS: temporal:7233
+      CONTROLLER_URL: http://host.docker.internal:18080
 
 volumes:
   temporal-data:
