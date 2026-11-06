@@ -115,6 +115,7 @@ type Snapshot struct {
 	Retry          orders.RetrySpec `json:"retry"`
 	StartToCloseMs int              `json:"startToCloseMs"`
 	Speed          float64          `json:"speed"`
+	Running        bool             `json:"running"` // clients are placing orders (the ▶ Play button)
 	TemporalUI     string           `json:"temporalUi"`
 }
 

@@ -60,7 +60,7 @@ type Controller struct {
 	clientDone [4]int
 	stats      StatsView
 	banner     BannerView
-	loadCancel context.CancelFunc
+	loadCancel context.CancelFunc // non-nil while clients are placing orders
 	startKick  chan struct{}
 }
 
@@ -186,23 +186,34 @@ func (c *Controller) SetStep(n int, force bool) {
 		c.workers[i].completed = 0
 	}
 	live := c.step.Live
-	var loadCtx context.Context
-	if live {
-		var cancel context.CancelFunc
-		loadCtx, cancel = context.WithCancel(context.Background())
-		c.loadCancel = cancel
-	}
 	c.mu.Unlock()
 
 	go c.terminateRunning(context.Background())
 	if live {
 		// Fresh worker containers so nothing from the previous step lingers in their caches.
-		go func() {
-			c.restartAllWorkers()
-			for cl := 0; cl < 4; cl++ {
-				go c.clientLoop(loadCtx, cl)
-			}
-		}()
+		// Clients stay idle until the presenter presses Play (SetRunning).
+		go c.restartAllWorkers()
+	}
+}
+
+// SetRunning starts (true) or stops (false) the four clients placing orders.
+// Orders already in flight carry on either way.
+func (c *Controller) SetRunning(run bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.step.Live || run == (c.loadCancel != nil) {
+		return
+	}
+	if !run {
+		c.loadCancel()
+		c.loadCancel = nil
+		c.say("Paused: clients stopped placing orders. Orders in flight finish.")
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.loadCancel = cancel
+	for cl := 0; cl < 4; cl++ {
+		go c.clientLoop(ctx, cl)
 	}
 }
 
@@ -258,6 +269,7 @@ func (c *Controller) snapshot() []byte {
 		Retry:          c.step.Retry,
 		StartToCloseMs: c.scaled(c.step.StartToCloseMs),
 		Speed:          c.speed,
+		Running:        c.loadCancel != nil,
 		TemporalUI:     c.cfg.TemporalUI,
 		Stats:          c.stats,
 		Orders:         []*Order{},
