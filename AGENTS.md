@@ -59,25 +59,33 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 
 ## Ports and the other local Temporal
 
-This machine also runs a **separate Temporal setup from another project** (containers
-`temporal` on `7233` and `temporal-ui` on `8233`). **Do not stop, restart or reuse them.**
-This project uses offset ports:
+This machine also runs **other projects**: a separate Temporal setup (containers `temporal` on
+`7233` and `temporal-ui` on `8233`) and Node apps on `8080` and `3000`.
+**Do not stop, restart or reuse them.** This project uses offset ports:
 
 | Service | Port |
 |---|---|
 | Temporal gRPC (`temporal-sim` container) | `17233` |
 | Temporal Web UI | `18233` |
-| Go controller (HTTP + WS) | `18080` (8080 is used by another app on this machine) |
-| Next.js dev server | `3000` |
+| Go controller (HTTP + WS) | `18080` |
+| Next.js dev server | `13000` |
 
 Only ever hammer / kill the `temporal-sim` container.
 
 ## Commands
 
 ```bash
-docker compose up -d                          # Temporal on :17233, UI on :18233
-cd backend && go run ./cmd/sim controller     # controller on :18080, spawns 4 workers
-cd frontend && pnpm install && pnpm dev       # UI on :3000, open http://localhost:3000/1
+make up          # Temporal in Docker (:17233, UI :18233)
+make dev         # controller (:18080, spawns 4 workers) + Next.js (:13000)
+open http://localhost:13000/1
+```
+
+Or by hand:
+
+```bash
+docker compose up -d
+cd backend && go run ./cmd/sim controller
+cd frontend && pnpm install && pnpm dev
 ```
 
 Checks before committing:
