@@ -130,13 +130,18 @@ export class QueueSim {
     this.sparks.push({ id: `${o.id}-${this.now}`, worker: w.id, bad, at: this.now });
   }
 
-  tick(dt: number) {
+  /**
+   * Advance the simulation. `now` is real time, so outages (10 s) and the
+   * redelivery timeout always last their stated seconds; `speed` only scales
+   * how fast orders move: client pace, fetching and each activity.
+   */
+  tick(dt: number, speed = 1) {
     this.now += dt;
     const now = this.now;
     for (let c = 0; c < 4; c++) {
       if (now >= this.nextAt[c]) {
         this.spawn(c);
-        this.nextAt[c] = now + EVERY[0] + this.rng() * (EVERY[1] - EVERY[0]);
+        this.nextAt[c] = now + (EVERY[0] + this.rng() * (EVERY[1] - EVERY[0])) / speed;
       }
     }
     if (now >= this.hubDown) {
@@ -152,7 +157,7 @@ export class QueueSim {
       }
     }
     for (const o of this.orders) {
-      o.t += dt;
+      o.t += dt * speed;
       const w = o.worker ? this.workers[o.worker - 1] : null;
       switch (o.state) {
         case "fetching":

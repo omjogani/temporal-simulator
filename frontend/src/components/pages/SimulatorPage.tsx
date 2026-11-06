@@ -34,15 +34,16 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   // Act 2: live snapshots from the Go controller (real Temporal).
   const live = useLive(step.id, step.live);
 
-  // Speed: scales the simulation clock (Act 1), the board animation, and on
-  // live steps the real activity durations and client pace in the controller.
+  // Speed: scales how fast orders move (dot travel, client pace, activity
+  // time; on live steps the controller does this with real activities).
+  // Outage timers such as the 10 s hammer always run in real time.
   const speed = useSpeed();
   useEffect(() => {
     if (step.live) void api.speed(speed);
   }, [speed, step.live]);
 
   const { now, wall } = useFrameLoop((dt) => {
-    if (sim && !frozen) sim.tick(dt * speed);
+    if (sim && !frozen) sim.tick(dt, speed);
   });
   const place = useDotMotion();
 
