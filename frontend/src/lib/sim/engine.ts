@@ -1,6 +1,7 @@
 // Act 1: an in-browser illustration of a homemade queue system.
 // It is deliberately not real infrastructure; Act 2 is where real Temporal runs.
 
+import { HUB_IN } from "../geometry";
 import { HAMMER_MS, SCORE_META, STEP_NAMES } from "../steps";
 import type { ArenaView, ChecklistRowView, DotView, NodeId, ScoreItemView, ScoreKey, ToolId, WorkerCardView } from "../types";
 
@@ -319,7 +320,7 @@ export class QueueSim {
     });
 
     const dots: DotView[] = [];
-    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: o.charged ? (o.charged > 1 ? "dup" : "charged") : "none", hidden: i > 41 }));
+    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: o.charged ? (o.charged > 1 ? "dup" : "charged") : "none", hidden: i >= HUB_IN.cells }));
     this.dlqList.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "side", slot: i }, ring: "none", hidden: i > 15 }));
     for (const o of this.orders) {
       if (o.state === "fetching" || o.state === "running" || o.state === "limbo")
@@ -342,8 +343,9 @@ export class QueueSim {
         downLeftMs: Math.max(0, this.hubDown - now),
         starting: false,
         info: hubDown ? `DOWN · ${Math.ceil((this.hubDown - now) / 1000)}s` : `waiting ${this.queue.length}`,
-        more: this.queue.length > 42 ? `+${this.queue.length - 42}` : undefined,
+        more: this.queue.length > HUB_IN.cells ? `+${this.queue.length - HUB_IN.cells} more` : undefined,
         lanes: false,
+        store: cfg.durable ? "disk" : "memory",
       },
       payments: {
         state: payDown ? "down" : "ok",

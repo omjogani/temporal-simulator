@@ -2,9 +2,22 @@
 import type { Loc } from "./types";
 
 export const VIEW = { w: 1000, h: 600 };
-export const HUB = { x: 500, y: 175, w: 320, h: 100 };
-export const PAY = { x: 880, y: 175, w: 170, h: 70 };
-export const SIDE = { x: 120, y: 175, w: 170, h: 100 };
+export const HUB = { x: 500, y: 180, w: 360, h: 112 };
+/** Inside the hub: a one-row task queue (head on the right) and a row for retry timers. */
+export const HUB_IN = {
+  cells: 14,
+  cell: 24,
+  queueY: HUB.y - HUB.h / 2 + 58,
+  timerY: HUB.y - HUB.h / 2 + 92,
+  timers: 5,
+  laneY0: HUB.y - HUB.h / 2 + 42,
+  laneH: 19,
+  laneCells: 13,
+};
+/** Centre x of queue cell k, counted from the head (k = 0 is next to be picked up). */
+export const queueCellX = (k: number): number => HUB.x + HUB.w / 2 - 14 - HUB_IN.cell / 2 - k * HUB_IN.cell;
+export const PAY = { x: 880, y: 180, w: 170, h: 70 };
+export const SIDE = { x: 120, y: 180, w: 170, h: 100 };
 export const CLIENTS = [200, 400, 600, 800].map((x, i) => ({ x, y: 36, i }));
 export const WORKER = { top: 320, w: 214, h: 255, xs: [130, 377, 623, 870], bend: [270, 292, 292, 270] };
 
@@ -116,11 +129,14 @@ export function slotPoint(loc: Loc): Pt | null {
     }
     case "hub": {
       if (loc.lane !== undefined) {
-        const k = Math.min(loc.slot, 12);
-        return [HUB.x - HUB.w / 2 + 46 + k * 19, HUB.y - HUB.h / 2 + 36 + loc.lane * 17];
+        const k = Math.min(loc.slot, HUB_IN.laneCells - 1);
+        return [queueCellX(k), HUB_IN.laneY0 + loc.lane * HUB_IN.laneH];
       }
-      const k = Math.min(loc.slot, 41);
-      return [HUB.x - HUB.w / 2 + 22 + (k % 14) * 20, HUB.y + 2 + Math.floor(k / 14) * 20];
+      if (loc.timer) {
+        const k = Math.min(loc.slot, HUB_IN.timers - 1);
+        return [HUB.x - HUB.w / 2 + 78 + k * HUB_IN.cell, HUB_IN.timerY];
+      }
+      return [queueCellX(Math.min(loc.slot, HUB_IN.cells - 1)), HUB_IN.queueY];
     }
     case "worker":
       return [WORKER.xs[loc.worker - 1] - WORKER.w / 2 + 20, WORKER.top + 54];

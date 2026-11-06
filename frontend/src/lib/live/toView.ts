@@ -1,5 +1,6 @@
 // Live snapshot → shared view model.
 
+import { HUB_IN } from "../geometry";
 import { COMP_NAME, SCORE_META, STEP_NAMES, type StepConfig } from "../steps";
 import type {
   ArenaView,
@@ -85,6 +86,7 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
   const holdSlot = [0, 0, 0, 0];
   const laneSlot = [0, 0, 0, 0];
   let hubSlot = 0;
+  let timerSlot = 0;
   let waiting = 0;
   let retrying = 0;
   const paused: SnapOrder[] = [];
@@ -102,15 +104,19 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
         else waiting++;
         const st = o.steps[o.current];
         const isRetry = o.status === "backoff";
+        // A retrying activity is not in the task queue: Temporal holds it as a timer
+        // and only puts it back on the queue when the backoff runs out.
         const loc = cfg.lanes
           ? { kind: "hub" as const, slot: laneSlot[o.client]++, lane: o.client }
-          : { kind: "hub" as const, slot: hubSlot++ };
+          : isRetry
+            ? { kind: "hub" as const, slot: timerSlot++, timer: true }
+            : { kind: "hub" as const, slot: hubSlot++ };
         dots.push({
           ...base,
           loc,
           ring: isRetry ? "retry" : ring,
           label: isRetry && st?.nextRetryAt ? secs(st.nextRetryAt - now) : undefined,
-          hidden: cfg.lanes ? loc.slot > 12 : loc.slot > 41,
+          hidden: loc.slot >= (cfg.lanes ? HUB_IN.laneCells : isRetry ? HUB_IN.timers : HUB_IN.cells),
         });
         break;
       }
@@ -178,7 +184,9 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
       downLeftMs: Math.max(0, tLeft),
       starting: !tUp && tLeft <= 0,
       info: !tUp ? (tLeft > 0 ? `DOWN · ${secs(tLeft)}` : "starting…") : `waiting ${waiting}${retrying ? ` · retrying ${retrying}` : ""}`,
+      more: !cfg.lanes && waiting > HUB_IN.cells ? `+${waiting - HUB_IN.cells} more` : undefined,
       lanes: cfg.lanes,
+      store: "history",
     },
     payments: {
       state: payDown ? "down" : paySlow ? "slow" : "ok",
@@ -228,7 +236,7 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
 /** Placeholder shown before the first snapshot arrives. */
 export function emptyLiveView(cfg: StepConfig, connected: boolean): ArenaView {
   return {
-    hub: { label: cfg.hub, up: false, downLeftMs: 0, starting: true, info: "connecting…", lanes: cfg.lanes },
+    hub: { label: cfg.hub, up: false, downLeftMs: 0, starting: true, info: "connecting…", lanes: cfg.lanes, store: "history" },
     payments: { state: "ok", leftMs: 0, info: "charges 0", flash: false },
     side: cfg.side === "paused" ? { kind: "paused", count: 0, chips: [] } : null,
     workers: [1, 2, 3, 4].map((id) => ({ id, up: false, downLeftMs: 0, status: "…", statusTone: "dim", ghost: false, rows: placeholder(), footer: "" })),

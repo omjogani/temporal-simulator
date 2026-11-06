@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { NodeFrame, SvgText, clientColor, toneColor } from "@/components/atoms/svg";
 import { ChecklistRow, ShelfChip } from "@/components/molecules/svg";
-import { CLIENTS, HUB, PAY, SIDE, WORKER } from "@/lib/geometry";
+import { CLIENTS, HUB, HUB_IN, PAY, SIDE, WORKER, queueCellX } from "@/lib/geometry";
 import type { HubView, NodeId, PaymentsView, SideView, WorkerCardView } from "@/lib/types";
 
 /** Makes a board node clickable and keyboard-operable. */
@@ -39,29 +39,97 @@ export function ClientNode({ index, wide, onHit }: { index: number; wide: boolea
   );
 }
 
+function StoreIcon({ x, y, kind }: { x: number; y: number; kind: HubView["store"] }) {
+  const stroke = kind === "memory" ? "var(--c-fault)" : "var(--c-ok)";
+  if (kind === "memory")
+    // a RAM chip: gone when the process dies
+    return (
+      <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke }}>
+        <rect x={-7} y={-6} width={14} height={12} rx={2} />
+        {[-4, 0, 4].map((d) => (
+          <path key={d} d={`M${d} -9v3M${d} 6v3`} />
+        ))}
+      </g>
+    );
+  // a disk cylinder: survives a crash
+  return (
+    <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke }}>
+      <ellipse cx={0} cy={-6} rx={7} ry={2.5} />
+      <path d="M-7 -6v11a7 2.5 0 0 0 14 0v-11M-7 -0.5a7 2.5 0 0 0 14 0" />
+    </g>
+  );
+}
+
+const STORE_TEXT: Record<HubView["store"], string> = {
+  memory: "in memory · wiped on crash",
+  disk: "messages on disk",
+  history: "history on disk",
+};
+
+/** One horizontal pipe of queue cells; the head (next out) is on the right. */
+function QueueTrack({ y, x0, h, cells, dim }: { y: number; x0: number; h: number; cells: number; dim: boolean }) {
+  const headR = h / 2 - 5;
+  const x1 = HUB.x + HUB.w / 2 - 12;
+  return (
+    <g opacity={dim ? 0.45 : 1}>
+      <rect x={x0} y={y - h / 2} width={x1 - x0} height={h} rx={h / 2} strokeWidth={1.5} style={{ fill: "var(--c-board)", stroke: "var(--c-line)" }} />
+      {Array.from({ length: cells }, (_, k) => (
+        <circle key={k} cx={queueCellX(k)} cy={y} r={k === 0 ? headR : 2.5} strokeWidth={1.5} style={k === 0 ? { fill: "none", stroke: "var(--c-ok-dim)" } : { fill: "var(--c-line)" }} />
+      ))}
+    </g>
+  );
+}
+
+/** The queue (Act 1) or Temporal Service (Act 2): a task queue pipe, retry timers and where state is stored. */
 export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => void }) {
   const left = HUB.x - HUB.w / 2;
+  const right = HUB.x + HUB.w / 2;
   const top = HUB.y - HUB.h / 2;
+  const down = !hub.up && !hub.starting;
+  const temporal = hub.store === "history";
   return (
     <Hit node="hub" label={hub.label} onHit={onHit}>
-      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={!hub.up && !hub.starting} highlight={hub.starting} />
-      <SvgText x={left + 14} y={top + 20} letterSpacing={1}>
+      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={down} highlight={hub.starting} />
+      <SvgText x={left + 14} y={top + 21} letterSpacing={1} weight={600}>
         {hub.label.toUpperCase()}
       </SvgText>
-      <SvgText x={left + HUB.w - 14} y={top + 20} textAnchor="end" tone={hub.up ? "dim" : hub.starting ? "gold" : "bad"}>
+      <SvgText x={right - 14} y={top + 21} textAnchor="end" tone={hub.up ? "dim" : hub.starting ? "gold" : "bad"}>
         {hub.info}
       </SvgText>
-      {hub.more && (
-        <SvgText x={left + HUB.w - 14} y={top + HUB.h - 10} textAnchor="end" size={11} tone="dim">
-          {hub.more}
-        </SvgText>
-      )}
-      {hub.lanes &&
-        [0, 1, 2, 3].map((i) => (
-          <SvgText key={i} x={left + 14} y={top + 40 + i * 17} size={10.5} color={clientColor(i)}>
-            C{i + 1}
+
+      {hub.lanes ? (
+        [0, 1, 2, 3].map((i) => {
+          const y = HUB_IN.laneY0 + i * HUB_IN.laneH;
+          return (
+            <g key={i}>
+              <SvgText x={left + 14} y={y + 4} size={10.5} color={clientColor(i)}>
+                C{i + 1}
+              </SvgText>
+              <QueueTrack y={y} x0={left + 40} h={16} cells={HUB_IN.laneCells} dim={down} />
+            </g>
+          );
+        })
+      ) : (
+        <>
+          <SvgText x={left + 14} y={HUB_IN.queueY - 20} size={10} tone="dim" letterSpacing={1}>
+            {temporal ? "TASK QUEUE · orders" : "QUEUE · orders"}
+            {hub.more && <tspan style={{ fill: "var(--c-gold)" }}>{`  ${hub.more}`}</tspan>}
           </SvgText>
-        ))}
+          <SvgText x={right - 14} y={HUB_IN.queueY - 20} size={10} tone="dim" textAnchor="end">
+            next out ▸
+          </SvgText>
+          <QueueTrack y={HUB_IN.queueY} x0={left + 12} h={28} cells={HUB_IN.cells} dim={down} />
+          {temporal && (
+            <SvgText x={left + 14} y={HUB_IN.timerY + 4} size={10} tone="dim" letterSpacing={1}>
+              TIMERS
+            </SvgText>
+          )}
+          <StoreIcon x={right - 14 - 7} y={HUB_IN.timerY} kind={hub.store} />
+          <SvgText x={right - 34} y={HUB_IN.timerY + 4} size={10.5} textAnchor="end" tone={hub.store === "memory" ? "bad" : "dim"}>
+            {STORE_TEXT[hub.store]}
+          </SvgText>
+        </>
+      )}
     </Hit>
   );
 }

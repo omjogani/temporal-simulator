@@ -52,7 +52,7 @@ export interface WorkerCardView {
 
 export type Loc =
   | { kind: "client"; client: number; slot: number }
-  | { kind: "hub"; slot: number; lane?: number }
+  | { kind: "hub"; slot: number; lane?: number; timer?: boolean }
   | { kind: "worker"; worker: number }
   | { kind: "side"; slot: number }
   | { kind: "gone" };
@@ -79,6 +79,8 @@ export interface HubView {
   info: string;
   more?: string;
   lanes: boolean;
+  /** Where the hub keeps its state: plain queue in RAM, queue on disk, or Temporal history. */
+  store: "memory" | "disk" | "history";
 }
 
 export interface PaymentsView {
