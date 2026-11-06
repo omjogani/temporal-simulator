@@ -8,7 +8,7 @@ import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepRail, 
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
-import { sparkViews, useLive } from "@/lib/live/useLive";
+import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim, simConfigFor } from "@/lib/sim/engine";
 import { STEPS, getStep } from "@/lib/steps";
@@ -51,7 +51,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   if (!step.live) view = sim ? sim.view() : emptyLiveView(step, true);
   else if (live.snapshot && live.snapshot.step === step.id) {
     const serverNow = wall + live.offset;
-    view = liveView(live.snapshot, step, serverNow, sparkViews(live.sparks, serverNow), live.connected);
+    view = liveView(live.snapshot, step, serverNow, live.connected);
   } else view = emptyLiveView(step, live.connected);
 
   const dots = place(view.dots, now, speed);
@@ -73,8 +73,6 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
         if (o) void api.pause(o.id);
       }
     } else if (node === "hub" && tool === "hammer") void api.hammerTemporal();
-    else if (node === "pay" && tool === "zap") void api.payments("down");
-    else if (node === "pay" && tool === "snail") void api.payments("slow");
   };
 
   const action = (a: ActionId) => {
@@ -87,9 +85,12 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     if (a === "recap") return setRecap((r) => !r);
     if (!step.live) {
       if (a === "flood") sim?.flood();
+      else if (a === "payDown") sim?.paymentsDown();
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);
+    else if (a === "payDown") void api.payments("down");
+    else if (a === "paySlow") void api.payments("slow");
     else if (a === "hammerAll") void api.hammerWorkers();
     else if (a === "pauseAll") void api.pause();
     else if (a === "resumeAll") void api.resume();
@@ -107,8 +108,8 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
       else if (e.key === "ArrowLeft" && step.id > 1) router.push(`/${step.id - 1}`);
       else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
-      else if (k === "z" && step.tools.includes("zap")) setTool("zap");
-      else if (k === "s" && step.tools.includes("snail")) setTool("snail");
+      else if (k === "z" && has("payDown")) action("payDown");
+      else if (k === "s" && has("paySlow")) action("paySlow");
       else if (k === "p" && step.tools.includes("pause")) setTool("pause");
       else if (k === "f") {
         if (has("bulk")) action("bulk");
@@ -145,6 +146,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           step={step}
           tool={tool}
           sched={view.sched}
+          payments={view.payments}
           frozen={frozen}
           onTool={setTool}
           onAction={action}

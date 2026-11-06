@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button, Kbd } from "@/components/atoms";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, StepRailItem, ToolButton, WorkerRow } from "@/components/molecules";
 import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
-import type { ActionId, PanelsView, SchedMode, ToolId } from "@/lib/types";
+import type { ActionId, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
 import styles from "./organisms.module.css";
 
 export { Board } from "./board/Board";
@@ -55,6 +55,7 @@ interface ToolboxProps {
   step: StepConfig;
   tool: ToolId;
   sched: SchedMode;
+  payments: PaymentsView;
   frozen: boolean;
   onTool: (t: ToolId) => void;
   onAction: (a: ActionId) => void;
@@ -62,7 +63,13 @@ interface ToolboxProps {
   onFreeze: () => void;
 }
 
-export function Toolbox({ step, tool, sched, frozen, onTool, onAction, onSched, onFreeze }: ToolboxProps) {
+const payActive = (a: ActionId, p: PaymentsView) => (a === "payDown" && p.state === "down") || (a === "paySlow" && p.state === "slow");
+
+/** Fault buttons show their own countdown while active (there is no Payments box on the board). */
+const actionLabel = (a: ActionId, p: PaymentsView) =>
+  payActive(a, p) ? `${ACTION_META[a].label} · ${Math.ceil(p.leftMs / 1000)}s` : ACTION_META[a].label;
+
+export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze }: ToolboxProps) {
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
       {step.tools.map((t) => (
@@ -83,7 +90,7 @@ export function Toolbox({ step, tool, sched, frozen, onTool, onAction, onSched, 
             ]}
           />
         ) : (
-          <ToolButton key={a} label={ACTION_META[a].label} hotkey={ACTION_META[a].key} onClick={() => onAction(a)} />
+          <ToolButton key={a} label={actionLabel(a, payments)} hotkey={ACTION_META[a].key} pressed={payActive(a, payments)} onClick={() => onAction(a)} />
         ),
       )}
       {!step.live && (

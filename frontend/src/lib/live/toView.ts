@@ -9,7 +9,6 @@ import type {
   LaneView,
   ScoreItemView,
   ScoreKey,
-  SparkView,
   WorkerCardView,
 } from "../types";
 import type { SnapOrder, SnapStep, Snapshot } from "./snapshot";
@@ -45,7 +44,7 @@ function row(st: SnapStep, i: number, now: number, temporalUp: boolean, ghost: b
 const placeholder = (): ChecklistRowView[] => STEP_NAMES.map((label) => ({ label, state: "placeholder" }));
 const doneCount = (o: SnapOrder) => o.steps.slice(0, 4).filter((s) => s.state === "done" || s.state === "reporting").length;
 
-export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: SparkView[], connected: boolean): ArenaView {
+export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: boolean): ArenaView {
   const tUp = s.temporal.up;
   const tLeft = s.temporal.downUntil - now;
 
@@ -191,12 +190,6 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
     payments: {
       state: payDown ? "down" : paySlow ? "slow" : "ok",
       leftMs: Math.max(0, (payDown ? s.payments.downUntil : s.payments.slowUntil) - now),
-      info: payDown
-        ? `500s · ${secs(s.payments.downUntil - now)}`
-        : paySlow
-          ? `slow 5s · ${secs(s.payments.slowUntil - now)}`
-          : `charges ${s.payments.charges}${s.payments.deduped ? ` · deduped ${s.payments.deduped}` : ""}`,
-      flash: sparks.some((x) => x.age < 220 && !x.bad),
     },
     side:
       cfg.side === "paused"
@@ -204,7 +197,6 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
         : null,
     workers,
     dots,
-    sparks,
     panels: {
       workers: s.workers.map((w) => ({
         id: w.id,
@@ -237,11 +229,10 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, sparks: Spar
 export function emptyLiveView(cfg: StepConfig, connected: boolean): ArenaView {
   return {
     hub: { label: cfg.hub, up: false, downLeftMs: 0, starting: true, info: "connecting…", lanes: cfg.lanes, store: "history" },
-    payments: { state: "ok", leftMs: 0, info: "charges 0", flash: false },
+    payments: { state: "ok", leftMs: 0 },
     side: cfg.side === "paused" ? { kind: "paused", count: 0, chips: [] } : null,
     workers: [1, 2, 3, 4].map((id) => ({ id, up: false, downLeftMs: 0, status: "…", statusTone: "dim", ghost: false, rows: placeholder(), footer: "" })),
     dots: [],
-    sparks: [],
     panels: {
       workers: [1, 2, 3, 4].map((id) => ({ id, up: false, note: "connecting", noteTone: "dim", completed: 0 })),
       service: { label: "Temporal Service", up: false, note: "…" },

@@ -69,8 +69,6 @@ export class QueueSim {
   private hubDown = 0;
   private payDown = 0;
   private charges = 0;
-  private payFlash = -1e9;
-  private sparks: { id: string; worker: number; bad: boolean; at: number }[] = [];
   private stats = { done: 0, lost: 0, dup: 0, dlq: 0 };
   private banner = { seq: 0, text: "" };
 
@@ -122,13 +120,10 @@ export class QueueSim {
     o.cur = 0;
   }
 
-  private charge(o: SimOrder, w: SimWorker) {
+  private charge(o: SimOrder) {
     o.charged++;
     this.charges++;
-    this.payFlash = this.now;
-    const bad = o.charged > 1;
-    if (bad) this.stats.dup++;
-    this.sparks.push({ id: `${o.id}-${this.now}`, worker: w.id, bad, at: this.now });
+    if (o.charged > 1) this.stats.dup++;
   }
 
   /**
@@ -176,7 +171,7 @@ export class QueueSim {
               this.fail(o, w);
               break;
             }
-            this.charge(o, w);
+            this.charge(o);
           }
           if (o.t >= ACT_MS) {
             o.done[o.cur] = true;
@@ -204,14 +199,12 @@ export class QueueSim {
           break;
       }
     }
-    this.sparks = this.sparks.filter((s) => now - s.at < 380);
     this.orders = this.orders.filter((o) => !(o.state === "done" || o.state === "lost") || now - o.endedAt < 1500);
   }
 
   private fail(o: SimOrder, w: SimWorker) {
     w.order = null;
     o.attempts++;
-    this.sparks.push({ id: `${o.id}-f${this.now}`, worker: w.id, bad: true, at: this.now });
     if (o.attempts >= MAX_ATTEMPTS) {
       o.state = "dlq";
       o.worker = 0;
@@ -229,7 +222,7 @@ export class QueueSim {
   hit(node: NodeId, tool: ToolId) {
     const now = this.now;
     if (node === "hub") {
-      if (tool !== "hammer") return this.say("Zap targets the Payments API.");
+      if (tool !== "hammer") return;
       this.hubDown = now + HAMMER_MS;
       if (!this.cfg.durable) {
         const n = this.queue.length;
@@ -241,15 +234,8 @@ export class QueueSim {
       }
       return;
     }
-    if (node === "pay") {
-      if (tool === "zap") {
-        this.payDown = now + HAMMER_MS;
-        this.say("Payments API returns 500s for 10 s.");
-      } else this.say("The hammer is for things you run. Use Zap on Payments.");
-      return;
-    }
     if (node.startsWith("w:")) {
-      if (tool !== "hammer") return this.say("Zap targets the Payments API.");
+      if (tool !== "hammer") return;
       const w = this.workers[Number(node.slice(2)) - 1];
       if (now < w.downUntil) return;
       w.downUntil = now + HAMMER_MS;
@@ -274,6 +260,12 @@ export class QueueSim {
       return;
     }
     if (node.startsWith("c:")) this.say("Those are your customers. Please don't hammer them.");
+  }
+
+  /** Payments API returns 500s for 10 s. */
+  paymentsDown() {
+    this.payDown = this.now + HAMMER_MS;
+    this.say("Payments API returns 500s for 10 s.");
   }
 
   flood() {
@@ -350,13 +342,10 @@ export class QueueSim {
       payments: {
         state: payDown ? "down" : "ok",
         leftMs: Math.max(0, this.payDown - now),
-        info: payDown ? `500s · ${Math.ceil((this.payDown - now) / 1000)}s` : `charges ${this.charges}`,
-        flash: now - this.payFlash < 220,
       },
       side: cfg.dlq ? { kind: "dlq", count: this.dlqList.length, chips: [] } : null,
       workers,
       dots,
-      sparks: this.sparks.map((s) => ({ id: s.id, worker: s.worker, bad: s.bad, age: now - s.at })),
       panels: {
         workers: this.workers.map((w) => {
           const down = now < w.downUntil;

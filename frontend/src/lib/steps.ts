@@ -37,11 +37,11 @@ export const STEPS: StepConfig[] = [
     hub: "Message queue",
     side: "dlq",
     lanes: false,
-    tools: ["hammer", "zap"],
-    actions: ["flood", "recap"],
+    tools: ["hammer"],
+    actions: ["flood", "payDown", "recap"],
     score: ["done", "inflight", "lost", "dup", "dlq"],
     tryThis:
-      "Hammer a worker after ✓ Charge card. 3 s later the order is redelivered and starts over at step 1, so the card is charged twice. Zap Payments: orders retry straight away, restart each time, and end up in dead letters. Open Recap at the end.",
+      "Hammer a worker after ✓ Charge card. 3 s later the order is redelivered and starts over at step 1, so the card is charged twice. Take Payments down: orders retry straight away, restart each time, and end up in dead letters. Open Recap at the end.",
   },
   {
     id: 3,
@@ -65,11 +65,11 @@ export const STEPS: StepConfig[] = [
     hub: "Temporal Service",
     side: null,
     lanes: false,
-    tools: ["hammer", "zap", "snail"],
-    actions: ["declined"],
+    tools: ["hammer"],
+    actions: ["payDown", "paySlow", "declined"],
     score: ["done", "inflight", "lost", "dup", "failed"],
     tryThis:
-      "Zap Payments for 10 s: Charge card retries after 1, 2, 4 and 8 s, with the retry timer held by Temporal, then succeeds once Payments is back. Use Slow: calls take 5 s, hit the 3 s timeout and retry. Send a declined card: it's non-retryable, so the order fails fast and releases its stock.",
+      "Take Payments down for 10 s: Charge card retries after 1, 2, 4 and 8 s, with the retry timer held by Temporal, then succeeds once Payments is back. Make Payments slow: calls take 5 s, hit the 3 s timeout and retry. Send a declined card: it's non-retryable, so the order fails fast and releases its stock.",
   },
   {
     id: 5,
@@ -105,8 +105,6 @@ export const getStep = (id: number): StepConfig | undefined => STEPS.find((s) =>
 
 export const TOOL_META: Record<ToolId, { label: string; key: string }> = {
   hammer: { label: "🔨 Hammer", key: "H" },
-  zap: { label: "⚡ Zap", key: "Z" },
-  snail: { label: "🐌 Slow", key: "S" },
   pause: { label: "⏸ Pause workflow", key: "P" },
 };
 
@@ -115,6 +113,8 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   bulk: { label: "Bulk import ×40", key: "F" },
   hammerAll: { label: "Hammer all workers", key: "A" },
   declined: { label: "Declined card", key: "D" },
+  payDown: { label: "⚡ Payments down", key: "Z" },
+  paySlow: { label: "🐌 Payments slow", key: "S" },
   pauseAll: { label: "Pause all" },
   resumeAll: { label: "Resume all" },
   recap: { label: "Recap" },

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { NodeFrame, SvgText, clientColor, toneColor } from "@/components/atoms/svg";
 import { ChecklistRow, ShelfChip } from "@/components/molecules/svg";
-import { CLIENTS, HUB, HUB_IN, PAY, SIDE, WORKER, queueCellX } from "@/lib/geometry";
-import type { HubView, NodeId, PaymentsView, SideView, WorkerCardView } from "@/lib/types";
+import { CLIENTS, HUB, HUB_IN, SIDE, WORKER, queueCellX } from "@/lib/geometry";
+import type { HubView, NodeId, SideView, WorkerCardView } from "@/lib/types";
 
 /** Makes a board node clickable and keyboard-operable. */
 export function Hit({ node, label, onHit, children }: { node: NodeId; label: string; onHit: (n: NodeId) => void; children: ReactNode }) {
@@ -130,21 +130,6 @@ export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => vo
           </SvgText>
         </>
       )}
-    </Hit>
-  );
-}
-
-export function PaymentsNode({ pay, onHit }: { pay: PaymentsView; onHit: (n: NodeId) => void }) {
-  const tone = pay.state === "down" ? "bad" : pay.state === "slow" ? "gold" : "dim";
-  return (
-    <Hit node="pay" label="Payments API" onHit={onHit}>
-      <NodeFrame x={PAY.x} y={PAY.y} w={PAY.w} h={PAY.h} down={pay.state === "down"} highlight={pay.state === "slow" || pay.flash} />
-      <SvgText x={PAY.x} y={PAY.y - 8} textAnchor="middle">
-        Payments API
-      </SvgText>
-      <SvgText x={PAY.x} y={PAY.y + 14} textAnchor="middle" size={11} tone={tone}>
-        {pay.info}
-      </SvgText>
     </Hit>
   );
 }

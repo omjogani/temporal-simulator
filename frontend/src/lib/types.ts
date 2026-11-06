@@ -3,18 +3,20 @@
 
 export type Tone = "neutral" | "good" | "bad" | "gold" | "dim";
 
-export type ToolId = "hammer" | "zap" | "snail" | "pause";
+export type ToolId = "hammer" | "pause";
 export type ActionId =
   | "flood"
   | "bulk"
   | "hammerAll"
   | "declined"
+  | "payDown"
+  | "paySlow"
   | "pauseAll"
   | "resumeAll"
   | "recap"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
-export type NodeId = "hub" | "pay" | "side" | `w:${number}` | `c:${number}`;
+export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}`;
 export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "dlq" | "failed" | "paused";
 
 export type RowState =
@@ -86,8 +88,6 @@ export interface HubView {
 export interface PaymentsView {
   state: "ok" | "down" | "slow";
   leftMs: number;
-  info: string;
-  flash: boolean;
 }
 
 export interface ShelfChip {
@@ -100,13 +100,6 @@ export interface SideView {
   kind: "dlq" | "paused";
   count: number;
   chips: ShelfChip[];
-}
-
-export interface SparkView {
-  id: string;
-  worker: number; // 1-based, 0 = hub
-  bad: boolean;
-  age: number; // ms
 }
 
 export interface ScoreItemView {
@@ -153,7 +146,6 @@ export interface ArenaView {
   side: SideView | null;
   workers: WorkerCardView[];
   dots: DotView[];
-  sparks: SparkView[];
   panels: PanelsView;
   banner: { seq: number; text: string };
   connected: boolean;

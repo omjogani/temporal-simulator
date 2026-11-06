@@ -16,7 +16,6 @@ export const HUB_IN = {
 };
 /** Centre x of queue cell k, counted from the head (k = 0 is next to be picked up). */
 export const queueCellX = (k: number): number => HUB.x + HUB.w / 2 - 14 - HUB_IN.cell / 2 - k * HUB_IN.cell;
-export const PAY = { x: 880, y: 180, w: 170, h: 70 };
 export const SIDE = { x: 120, y: 180, w: 170, h: 100 };
 export const CLIENTS = [200, 400, 600, 800].map((x, i) => ({ x, y: 36, i }));
 export const WORKER = { top: 320, w: 214, h: 255, xs: [130, 377, 623, 870], bend: [270, 292, 292, 270] };

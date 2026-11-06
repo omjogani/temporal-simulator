@@ -84,22 +84,6 @@ export function OrderDot({ x, y, client, ring, opacity, ghost, declined, lost, l
   );
 }
 
-export function Spark({ from, to, bad, age }: { from: Pt; to: Pt; bad: boolean; age: number }) {
-  return (
-    <line
-      x1={from[0]}
-      y1={from[1]}
-      x2={to[0]}
-      y2={to[1]}
-      strokeWidth={2.5}
-      strokeDasharray={bad ? "5 5" : undefined}
-      style={{ stroke: bad ? "var(--c-fault)" : "var(--c-gold)" }}
-      opacity={Math.max(0, 1 - age / 380)}
-    />
-  );
-}
-
-/** The square on a to-do row. */
 export function Checkbox({ x, y, state, ghost }: { x: number; y: number; state: RowState; ghost?: boolean }) {
   let stroke = "var(--c-ghost)";
   let fill = "none";
