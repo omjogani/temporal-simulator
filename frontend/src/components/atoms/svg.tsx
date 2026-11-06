@@ -1,7 +1,7 @@
 // SVG atoms for the board. Colours come from design tokens via inline style.
 import type { ReactNode, SVGProps } from "react";
 import type { Ring, RowState, Tone } from "@/lib/types";
-import type { Pt } from "@/lib/geometry";
+import { smooth, type Pt } from "@/lib/geometry";
 
 export const toneColor: Record<Tone, string> = {
   neutral: "var(--c-ink)",
@@ -49,13 +49,11 @@ export function NodeFrame({ x, y, w, h, down, highlight, stroke }: { x: number; 
 }
 
 export function Wire({ pts }: { pts: Pt[] }) {
+  const d = smooth(pts)
+    .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join("");
   return (
-    <g>
-      <polyline points={pts.map((p) => p.join(",")).join(" ")} fill="none" strokeWidth={2} strokeLinejoin="round" style={{ stroke: "var(--c-wire)" }} opacity={0.75} />
-      {pts.slice(1, -1).map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={3} style={{ fill: "var(--c-wire)" }} />
-      ))}
-    </g>
+    <path d={d} fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: "var(--c-wire)" }} opacity={0.75} />
   );
 }
 

@@ -15,7 +15,41 @@ export interface Path {
   len: number;
 }
 
-export function mkPath(pts: Pt[]): Path {
+/** Corner radius of every wire bend, in viewBox units. */
+export const BEND_R = 26;
+
+/**
+ * Replace each sharp corner with a sampled quadratic curve so wires (and the dots
+ * travelling on them) bend smoothly. The radius shrinks to fit short segments.
+ */
+export function smooth(input: Pt[], r = BEND_R): Pt[] {
+  const pts = input.filter((p, i) => i === 0 || Math.hypot(p[0] - input[i - 1][0], p[1] - input[i - 1][1]) > 0.5);
+  if (pts.length < 3) return pts;
+  const out: Pt[] = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [ax, ay] = pts[i - 1];
+    const [px, py] = pts[i];
+    const [bx, by] = pts[i + 1];
+    const la = Math.hypot(ax - px, ay - py);
+    const lb = Math.hypot(bx - px, by - py);
+    const cross = (ax - px) * (by - py) - (ay - py) * (bx - px);
+    if (Math.abs(cross) < 1e-6 * la * lb) continue; // straight through
+    const k = Math.min(r, la / 2, lb / 2);
+    const s: Pt = [px + ((ax - px) / la) * k, py + ((ay - py) / la) * k];
+    const e: Pt = [px + ((bx - px) / lb) * k, py + ((by - py) / lb) * k];
+    const n = 10;
+    for (let j = 0; j <= n; j++) {
+      const t = j / n;
+      const u = 1 - t;
+      out.push([u * u * s[0] + 2 * u * t * px + t * t * e[0], u * u * s[1] + 2 * u * t * py + t * t * e[1]]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+export function mkPath(raw: Pt[]): Path {
+  const pts = smooth(raw);
   const segs: Path["segs"] = [];
   let len = 0;
   for (let i = 1; i < pts.length; i++) {
