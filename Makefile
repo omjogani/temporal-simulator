@@ -4,10 +4,10 @@
 up: ## Start Temporal and the 4 worker containers (Docker); gRPC :17233, Web UI :18233
 	docker compose up -d --build
 
-down: ## Stop Temporal (keeps its data volume)
+down: ## Stop Temporal, Postgres and the workers (keeps the Postgres volume)
 	docker compose down
 
-reset-temporal: ## Stop Temporal and wipe its history
+reset-temporal: ## Stop everything and wipe Temporal history (Postgres volume)
 	docker compose down -v
 
 backend: ## Run the Go controller on :18080 (it starts/kills the worker containers)

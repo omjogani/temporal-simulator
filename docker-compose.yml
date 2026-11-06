@@ -1,35 +1,95 @@
-# Local Temporal and the four workers for the simulator.
-# Dev server with a SQLite file on a named volume, so killing and restarting the
-# container (the "hammer Temporal" tool) keeps every workflow and its history.
+# Temporal (backed by Postgres), its Web UI and the four workers for the simulator.
 #
-# Ports are offset (17233 / 18233) so this can run next to another local Temporal.
+# Hammering Temporal kills only the `temporal-sim` server container. Postgres keeps
+# running, so every workflow and its history survive and the server picks up where it
+# stopped. Ports are offset (17233 / 18233) so this runs next to another local Temporal.
 services:
-  temporal:
-    image: temporalio/temporal:1.10.0
-    container_name: temporal-sim
+  postgres:
+    image: postgres:17-alpine
+    container_name: temporal-sim-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: create the temporal and temporal_visibility databases and bring their
+  # schemas up to date. Safe to run again on every `docker compose up`.
+  temporal-schema:
+    image: temporalio/admin-tools:1.32.1
+    container_name: temporal-sim-schema
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
     command:
-      - server
-      - start-dev
-      - --ip=0.0.0.0
-      - --db-filename=/home/temporal/data/temporal.db
-      - --dynamic-config-value=matching.useNewMatcher=true    # task queue priority
-      - --dynamic-config-value=matching.enableFairness=true   # fairness keys
+      - |
+        set -e
+        sql() { temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u temporal --pw temporal "$$@"; }
+        S=/etc/temporal/schema/postgresql/v12
+        for db in temporal temporal_visibility; do
+          sql --db "$$db" create-database 2>/dev/null || true
+        done
+        sql --db temporal setup-schema -v 0.0 2>/dev/null || true
+        sql --db temporal update-schema -d $$S/temporal/versioned
+        sql --db temporal_visibility setup-schema -v 0.0 2>/dev/null || true
+        sql --db temporal_visibility update-schema -d $$S/visibility/versioned
+    restart: "no"
+
+  temporal:
+    image: temporalio/server:1.32.1
+    container_name: temporal-sim
+    depends_on:
+      temporal-schema:
+        condition: service_completed_successfully
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig/sim.yaml
+      LOG_LEVEL: warn
+    volumes:
+      - ./temporal/dynamicconfig.yaml:/etc/temporal/dynamicconfig/sim.yaml:ro
     ports:
       - "17233:7233"  # gRPC (controller + workers)
-      - "18233:8233"  # Temporal Web UI
-    volumes:
-      - temporal-data:/home/temporal/data
     restart: "no"     # the controller decides when it comes back after a hammer
-    depends_on:
-      temporal-data-perms:
-        condition: service_completed_successfully
 
-  # One-shot helper: named volumes are created root-owned, the server runs as uid 1000.
-  temporal-data-perms:
-    image: busybox:1.36
-    command: ["sh", "-c", "chown -R 1000:1000 /data"]
-    volumes:
-      - temporal-data:/data
+  # One-shot: register the `default` namespace once the server answers.
+  temporal-namespace:
+    image: temporalio/admin-tools:1.32.1
+    container_name: temporal-sim-namespace
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until temporal operator cluster health >/dev/null 2>&1; do sleep 1; done
+        temporal operator namespace describe --namespace default >/dev/null 2>&1 ||
+          temporal operator namespace create --namespace default --retention 24h
+    restart: "no"
+
+  temporal-ui:
+    image: temporalio/ui:2.57.0
+    container_name: temporal-sim-ui
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:18233
+    ports:
+      - "18233:8080"  # Temporal Web UI
 
   # The four workers, one container each, named so they are easy to spot in Docker
   # Desktop. The controller (on the host) hammers them with `docker kill` and brings
@@ -70,4 +130,4 @@ services:
       CONTROLLER_URL: http://host.docker.internal:18080
 
 volumes:
-  temporal-data:
+  postgres-data:

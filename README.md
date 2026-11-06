@@ -44,18 +44,20 @@ Browser (Next.js) ──WebSocket──▶ Go controller ──docker kill/start
   `worker-noodle`) running the Temporal Go SDK, one activity at a time. The hammer is a real
   `docker kill`, so you can watch the container exit in Docker Desktop; it starts again after 10 s.
 - **Hammering Temporal** runs `docker kill` on the `temporal-sim` container and starts it again
-  10 s later. History survives because the dev server stores it in SQLite on a volume.
+  10 s later. Workflow history lives in Postgres (`temporal-sim-postgres`), which keeps
+  running, so nothing is lost.
 - **Ticks on the worker to-do lists come from Temporal**: the workflow publishes its progress
   as a memo after each recorded activity, and the controller reads it back.
 - **Payments** is a fake API in the controller with outage and slow switches. It dedups on the
   workflow ID used as an idempotency key, which is why retries never charge twice.
 - **Priority and fairness** use real task queue `PriorityKey` and `FairnessKey` values, which the
-  dev server has turned on in `docker-compose.yml`.
+  server turns on in `temporal/dynamicconfig.yaml`.
 
 ## Layout
 
 ```
-docker-compose.yml   Temporal dev server
+docker-compose.yml   Postgres, Temporal server + Web UI, 4 worker containers
+temporal/            Temporal dynamic config (priority + fairness)
 backend/             Go: workflow, activities, worker, controller (see backend/internal)
 frontend/            Next.js, atomic design (see frontend/README.md)
 AGENTS.md            Notes for coding agents: ports, conventions, honesty rules

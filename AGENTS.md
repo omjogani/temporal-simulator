@@ -29,7 +29,9 @@ https://claude.ai/artifact/EbTRza5nYMYpqSusyyocBe
 ## Layout
 
 ```
-docker-compose.yml        Temporal dev server (SQLite on a volume, priority + fairness enabled)
+docker-compose.yml        Postgres + Temporal server (temporalio/server) + Web UI + 4 worker
+                          containers; one-shot services set up the schema and `default` namespace
+temporal/dynamicconfig.yaml  priority + fairness switches for the server
 backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
@@ -52,7 +54,9 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
   Workers reach the controller at `host.docker.internal:18080`. Names live in
   `backend/internal/orders/types.go` and `frontend/src/lib/steps.ts`; keep them in sync.
 - Hammering Temporal runs `docker kill temporal-sim`, then `docker start temporal-sim` after 10 s.
-  History survives because the dev server uses a SQLite file on a named volume.
+  History survives because it lives in Postgres (`temporal-sim-postgres`, volume
+  `postgres-data`), which the hammer never touches. The schema is created/updated by the
+  one-shot `temporal-schema` service (admin-tools) on every `docker compose up`.
 - Each worker runs one activity at a time (`MaxConcurrentActivityExecutionSize: 1`) so a
   worker card shows exactly one order. Activities heartbeat so a killed worker is detected fast.
 - Ticks on the worker to-do list come from Temporal: the workflow upserts a `progress` memo

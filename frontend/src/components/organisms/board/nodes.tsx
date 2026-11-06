@@ -64,7 +64,7 @@ function StoreIcon({ x, y, kind }: { x: number; y: number; kind: HubView["store"
 const STORE_TEXT: Record<HubView["store"], string> = {
   memory: "in memory · wiped on crash",
   disk: "messages on disk",
-  history: "history on disk",
+  history: "history in Postgres",
 };
 
 /** One horizontal pipe of queue cells; the head (next out) is on the right. */
