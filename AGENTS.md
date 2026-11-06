@@ -44,7 +44,7 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 
 ## How the live steps work
 
-- `sim controller` (port 8080) spawns 4 real worker processes (`sim worker --id 1..4`).
+- `sim controller` (port 18080) spawns 4 real worker processes (`sim worker --id 1..4`).
   Hammering a worker is a real SIGKILL; it is restarted after 10 s.
 - Hammering Temporal runs `docker kill temporal-sim`, then `docker start temporal-sim` after 10 s.
   History survives because the dev server uses a SQLite file on a named volume.
@@ -55,7 +55,7 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
   Workers also push `started` / `finished` events to the controller for live progress.
 - The controller hosts a fake Payments API with fault switches (down = 500s, slow = 5 s,
   declined card = 402 non-retryable). It dedups by idempotency key (the workflow ID).
-- The browser gets one state snapshot about 10 times a second over `ws://localhost:8080/ws`.
+- The browser gets one state snapshot about 10 times a second over `ws://localhost:18080/ws`.
 
 ## Ports and the other local Temporal
 
@@ -67,7 +67,7 @@ This project uses offset ports:
 |---|---|
 | Temporal gRPC (`temporal-sim` container) | `17233` |
 | Temporal Web UI | `18233` |
-| Go controller (HTTP + WS) | `8080` |
+| Go controller (HTTP + WS) | `18080` (8080 is used by another app on this machine) |
 | Next.js dev server | `3000` |
 
 Only ever hammer / kill the `temporal-sim` container.
@@ -76,7 +76,7 @@ Only ever hammer / kill the `temporal-sim` container.
 
 ```bash
 docker compose up -d                          # Temporal on :17233, UI on :18233
-cd backend && go run ./cmd/sim controller     # controller on :8080, spawns 4 workers
+cd backend && go run ./cmd/sim controller     # controller on :18080, spawns 4 workers
 cd frontend && pnpm install && pnpm dev       # UI on :3000, open http://localhost:3000/1
 ```
 
