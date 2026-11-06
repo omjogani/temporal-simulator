@@ -1,0 +1,101 @@
+/* Shared styles for the HTML atoms. */
+
+.button {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font: 500 var(--fs-sm) / 1 var(--font-mono);
+  padding: 8px 11px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  background: var(--c-panel);
+}
+.button:hover {
+  border-color: var(--c-dim);
+}
+.button[aria-pressed="true"] {
+  border-color: var(--c-gold);
+  color: var(--c-gold);
+}
+.button:focus-visible {
+  outline: 2px solid var(--c-gold);
+  outline-offset: 2px;
+}
+
+.kbd {
+  font: inherit;
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-ok);
+  flex: none;
+}
+.dot[data-up="false"] {
+  background: var(--c-fault);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-fault) 30%, transparent);
+}
+
+.big {
+  display: block;
+  font: 800 var(--fs-xl) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  transform-origin: left center;
+}
+.big[data-size="sm"] {
+  font-size: 30px;
+}
+.big[data-tone="good"] { color: var(--c-ok); }
+.big[data-tone="bad"] { color: var(--c-fault); }
+.big[data-tone="gold"] { color: var(--c-gold); }
+.big[data-tone="dim"] { color: var(--c-dim); }
+.bump {
+  animation: bump 0.45s ease-out;
+}
+@keyframes bump {
+  from { transform: scale(1.25); }
+  to { transform: scale(1); }
+}
+
+.tag {
+  font: 500 11px / 1 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.tag[data-tone="good"] { color: var(--c-ok); }
+.tag[data-tone="bad"] { color: var(--c-fault); }
+.tag[data-tone="gold"] { color: var(--c-gold); }
+
+.pill {
+  font: 500 13px / 1 var(--font-mono);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: var(--c-dim);
+  white-space: nowrap;
+}
+.pill b {
+  color: var(--c-gold);
+  font-weight: 500;
+}
+
+.label {
+  font: 500 11px / 1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+}

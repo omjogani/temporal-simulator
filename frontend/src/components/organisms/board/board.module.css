@@ -1,0 +1,12 @@
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+.svg [role="button"]:focus-visible {
+  outline: none;
+}
+.svg [role="button"]:focus-visible > rect:first-child {
+  stroke: var(--c-gold) !important;
+}
