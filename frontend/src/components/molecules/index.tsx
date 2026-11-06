@@ -24,6 +24,16 @@ export function SegmentedControl<T extends string>({ label, options, value, onCh
   );
 }
 
+/** Start / pause the clients placing orders. Every step loads paused. */
+export function PlayButton({ playing, onToggle }: { playing: boolean; onToggle: () => void }) {
+  return (
+    <Button pressed={!playing} onClick={onToggle}>
+      {playing ? "❚❚ Pause" : "▶ Play"}
+      <Kbd>␣</Kbd>
+    </Button>
+  );
+}
+
 /** Visualization speed: a stepped range input with the current value. */
 export function SpeedSlider({ value, stops, onChange }: { value: number; stops: readonly number[]; onChange: (v: number) => void }) {
   const index = Math.max(0, stops.indexOf(value));

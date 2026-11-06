@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Tag } from "@/components/atoms";
-import { SpeedSlider } from "@/components/molecules";
+import { PlayButton, SpeedSlider } from "@/components/molecules";
 import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { api } from "@/lib/live/api";
@@ -98,6 +98,13 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
 
   const setSched = (m: SchedMode) => void api.sched(m);
 
+  // Play / pause: clients only place orders while playing. Every step loads paused.
+  const playing = step.live ? Boolean(live.snapshot?.running) : Boolean(sim?.running);
+  const togglePlay = () => {
+    if (step.live) void api.run(!playing);
+    else sim?.setRunning(!playing);
+  };
+
   // Keyboard: ← → steps, tool and action hotkeys, space to freeze (Act 1).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -119,9 +126,9 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       else if (k === "r") action("reset");
       else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
       else if (e.key === "=" || e.key === "+") nudgeSpeed(1);
-      else if (e.key === " " && !step.live) {
+      else if (e.key === " ") {
         e.preventDefault();
-        setFrozen((f) => !f);
+        togglePlay();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -140,7 +147,12 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           </a>
         ) : undefined
       }
-      speed={<SpeedSlider value={speed} stops={SPEED_STOPS} onChange={setSpeed} />}
+      speed={
+        <>
+          <PlayButton playing={playing} onToggle={togglePlay} />
+          <SpeedSlider value={speed} stops={SPEED_STOPS} onChange={setSpeed} />
+        </>
+      }
       toolbox={
         <Toolbox
           step={step}

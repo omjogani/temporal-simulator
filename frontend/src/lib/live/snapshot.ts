@@ -53,5 +53,6 @@ export interface Snapshot {
   retry: { initialMs: number; coefficient: number; maxMs: number; maxAttempts: number };
   startToCloseMs: number;
   speed: number;
+  running: boolean;
   temporalUi: string;
 }

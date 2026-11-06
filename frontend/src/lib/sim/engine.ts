@@ -66,6 +66,8 @@ export class QueueSim {
   private dlqList: SimOrder[] = [];
   private workers: SimWorker[];
   private nextAt = [0, 0, 0, 0];
+  /** Clients only place orders after the presenter presses Play. */
+  running = false;
   private hubDown = 0;
   private payDown = 0;
   private charges = 0;
@@ -135,7 +137,7 @@ export class QueueSim {
     this.now += dt;
     const now = this.now;
     for (let c = 0; c < 4; c++) {
-      if (now >= this.nextAt[c]) {
+      if (this.running && now >= this.nextAt[c]) {
         this.spawn(c);
         this.nextAt[c] = now + (EVERY[0] + this.rng() * (EVERY[1] - EVERY[0])) / speed;
       }
@@ -266,6 +268,13 @@ export class QueueSim {
   paymentsDown() {
     this.payDown = this.now + HAMMER_MS;
     this.say("Payments API returns 500s for 10 s.");
+  }
+
+  setRunning(run: boolean) {
+    if (run === this.running) return;
+    this.running = run;
+    if (run) this.nextAt = this.nextAt.map(() => this.now + 200 + this.rng() * 1500);
+    else this.say("Paused: clients stopped placing orders. Orders in flight finish.");
   }
 
   flood() {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button, Kbd, UrlPill } from "@/components/atoms";
+import { Button, UrlPill } from "@/components/atoms";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
 import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
 import type { ActionId, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
@@ -95,7 +95,7 @@ export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction,
       )}
       {!step.live && (
         <Button onClick={onFreeze}>
-          {frozen ? "Unfreeze" : "Freeze"} <Kbd>␣</Kbd>
+          {frozen ? "Unfreeze" : "Freeze"}
         </Button>
       )}
       <ToolButton label="Reset" hotkey="R" onClick={() => onAction("reset")} />

@@ -25,7 +25,8 @@ make dev    # Go controller on :18080 (drives the workers) + Next.js on :13000
 
 Open <http://localhost:13000/1>. Use ← → to move between steps.
 
-The **Speed** slider (or `-` / `+`) changes how fast orders move, from 0.25× to 2×: dot travel,
+Every step loads paused: press **▶ Play** (or Space) to start the clients placing orders, and
+again to pause them (orders in flight finish). The **Speed** slider (or `-` / `+`) changes how fast orders move, from 0.25× to 2×: dot travel,
 client pace and activity time. On `/3`–`/6` the controller does this for real by scaling activity
 durations, client pace, the start-to-close timeout and the slow-Payments delay for new orders.
 Outages always run in real seconds: the 10 s hammer, the 3 s redelivery in `/2` and the retry
