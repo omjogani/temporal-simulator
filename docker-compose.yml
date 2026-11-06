@@ -1,0 +1,35 @@
+# Local Temporal for the simulator.
+# Dev server with a SQLite file on a named volume, so killing and restarting the
+# container (the "hammer Temporal" tool) keeps every workflow and its history.
+#
+# Ports are offset (17233 / 18233) so this can run next to another local Temporal.
+services:
+  temporal:
+    image: temporalio/temporal:1.10.0
+    container_name: temporal-sim
+    command:
+      - server
+      - start-dev
+      - --ip=0.0.0.0
+      - --db-filename=/home/temporal/data/temporal.db
+      - --dynamic-config-value=matching.useNewMatcher=true    # task queue priority
+      - --dynamic-config-value=matching.enableFairness=true   # fairness keys
+    ports:
+      - "17233:7233"  # gRPC (controller + workers)
+      - "18233:8233"  # Temporal Web UI
+    volumes:
+      - temporal-data:/home/temporal/data
+    restart: "no"     # the controller decides when it comes back after a hammer
+    depends_on:
+      temporal-data-perms:
+        condition: service_completed_successfully
+
+  # One-shot helper: named volumes are created root-owned, the server runs as uid 1000.
+  temporal-data-perms:
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - temporal-data:/data
+
+volumes:
+  temporal-data:

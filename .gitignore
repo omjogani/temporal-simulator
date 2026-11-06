@@ -1,0 +1,9 @@
+# deps / builds
+node_modules/
+.next/
+out/
+dist/
+backend/bin/
+*.log
+.DS_Store
+.env*.local
