@@ -1,0 +1,56 @@
+// Mirrors backend/internal/controller/state.go (JSON over the WebSocket).
+
+export type StepState = "pending" | "running" | "reporting" | "done" | "backoff" | "interrupted" | "failed" | "skipped";
+export type OrderStatus =
+  | "holding"
+  | "queued"
+  | "running"
+  | "backoff"
+  | "interrupted"
+  | "finishing"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "lost";
+
+export interface SnapStep {
+  state: StepState;
+  attempt: number;
+  startedAt?: number;
+  durationMs?: number;
+  nextRetryAt?: number;
+  error?: string;
+  worker: number;
+}
+
+export interface SnapOrder {
+  id: string;
+  num: number;
+  client: number;
+  declined: boolean;
+  status: OrderStatus;
+  worker: number;
+  steps: SnapStep[];
+  current: number;
+  charged: number;
+  pauseRequested: boolean;
+  endedAt?: number;
+}
+
+export interface Snapshot {
+  now: number;
+  step: number;
+  live: boolean;
+  temporal: { up: boolean; downUntil: number };
+  workers: { id: number; up: boolean; downUntil: number; completed: number }[];
+  payments: { downUntil: number; slowUntil: number; charges: number; deduped: number; failures: number };
+  orders: SnapOrder[];
+  stats: { done: number; failed: number; lost: number; duplicates: number; inflight: number; paused: number };
+  sched: "fifo" | "priority" | "fair";
+  waits: number[];
+  clientDone: number[];
+  banner: { seq: number; text: string };
+  retry: { initialMs: number; coefficient: number; maxMs: number; maxAttempts: number };
+  startToCloseMs: number;
+  temporalUi: string;
+}
