@@ -1,0 +1,53 @@
+/* Design tokens. The simulator is one dark "arena" look (it is projected during
+   a talk), so there is a single theme on purpose. */
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --c-bg: #14171c;
+  --c-board: #1a1e24;
+  --c-panel: #20252d;
+  --c-panel-2: #2a2f38;
+  --c-line: #363d48;
+  --c-wire: #7a6a45;
+
+  /* text */
+  --c-ink: #e8ebe4;
+  --c-dim: #8b94a0;
+  --c-ghost: #5c6470;
+
+  /* meaning (never decoration) */
+  --c-ok: #45c9a8;       /* done, healthy */
+  --c-ok-dim: #2f6e60;
+  --c-fault: #f2804b;    /* lost, down, duplicate */
+  --c-fault-bg: #3a2a25;
+  --c-gold: #e9c04f;     /* charged, retrying, attention */
+  --c-violet: #a07cf0;   /* declined card */
+
+  /* clients (identity only) */
+  --c-client-1: #e5645c;
+  --c-client-2: #5fb865;
+  --c-client-3: #5ea2f0;
+  --c-client-4: #d6a531;
+
+  /* type */
+  --font-display: var(--font-big-shoulders), "Arial Narrow", Impact, sans-serif;
+  --font-body: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, Consolas, monospace;
+
+  --fs-xs: 10.5px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-lg: 26px;
+  --fs-xl: 46px;
+
+  /* shape + space */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+}
