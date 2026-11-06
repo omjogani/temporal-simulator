@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { BigNumber, Button, Kbd, StatusDot } from "@/components/atoms";
 import type { LaneView, RetryPolicyView, ScoreItemView, WorkerRowView } from "@/lib/types";
 import styles from "./molecules.module.css";
@@ -98,15 +97,5 @@ export function PolicyList({ policy }: { policy: RetryPolicyView }) {
         </div>
       ))}
     </div>
-  );
-}
-
-export function StepRailItem({ id, act, name, current }: { id: number; act: 1 | 2; name: string; current: boolean }) {
-  return (
-    <Link href={`/${id}`} className={styles.railItem} data-act={act} aria-current={current ? "step" : undefined}>
-      <small>{act === 1 ? "Queue" : "Temporal"}</small>
-      <b>/{id}</b>
-      {name}
-    </Link>
   );
 }

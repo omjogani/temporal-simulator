@@ -42,22 +42,31 @@
   margin: 0 4px;
 }
 
-.rail {
-  display: grid;
-  grid-template-columns: auto repeat(6, minmax(0, 1fr)) auto;
+.stepNav {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  align-items: stretch;
 }
 .nav {
   all: unset;
   cursor: pointer;
   display: grid;
   place-items: center;
-  padding: 0 12px;
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--c-line);
   border-radius: var(--radius-sm);
   background: var(--c-panel);
-  color: var(--c-dim);
+  color: var(--c-ink);
+  font-size: 17px;
+}
+.nav:hover {
+  border-color: var(--c-gold);
+  color: var(--c-gold);
+}
+.nav:focus-visible {
+  outline: 2px solid var(--c-gold);
+  outline-offset: 2px;
 }
 .nav[aria-disabled="true"] {
   opacity: 0.3;

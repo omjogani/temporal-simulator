@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Button, Kbd } from "@/components/atoms";
-import { LaneBar, PolicyList, ScoreStat, SegmentedControl, StepRailItem, ToolButton, WorkerRow } from "@/components/molecules";
+import { Button, Kbd, UrlPill } from "@/components/atoms";
+import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
 import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
 import type { ActionId, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
 import styles from "./organisms.module.css";
@@ -103,18 +103,17 @@ export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction,
   );
 }
 
-export function StepRail({ current }: { current: number }) {
-  const prev = current > 1 ? `/${current - 1}` : null;
-  const next = current < STEPS.length ? `/${current + 1}` : null;
+/** Previous / next step arrows around the URL pill (← → keys do the same). */
+export function StepNav({ current }: { current: number }) {
+  const prev = STEPS.find((s) => s.id === current - 1);
+  const next = STEPS.find((s) => s.id === current + 1);
   return (
-    <nav className={styles.rail} aria-label="Steps">
-      <Link href={prev ?? "#"} className={styles.nav} aria-label="Previous step" aria-disabled={!prev}>
+    <nav className={styles.stepNav} aria-label="Steps">
+      <Link href={prev ? `/${prev.id}` : "#"} className={styles.nav} aria-label={prev ? `Previous: ${prev.name}` : "Previous step"} title={prev?.name} aria-disabled={!prev}>
         ←
       </Link>
-      {STEPS.map((s) => (
-        <StepRailItem key={s.id} id={s.id} act={s.act} name={s.name} current={s.id === current} />
-      ))}
-      <Link href={next ?? "#"} className={styles.nav} aria-label="Next step" aria-disabled={!next}>
+      <UrlPill host="localhost:13000" path={String(current)} />
+      <Link href={next ? `/${next.id}` : "#"} className={styles.nav} aria-label={next ? `Next: ${next.name}` : "Next step"} title={next?.name} aria-disabled={!next}>
         →
       </Link>
     </nav>

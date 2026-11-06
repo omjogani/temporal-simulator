@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Tag, UrlPill } from "@/components/atoms";
+import { Tag } from "@/components/atoms";
 import { SpeedSlider } from "@/components/molecules";
-import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepRail, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
+import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
@@ -130,7 +130,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
 
   return (
     <ArenaTemplate
-      url={<UrlPill host="localhost:13000" path={String(step.id)} />}
+      url={<StepNav current={step.id} />}
       title={step.name}
       tag={<Tag tone={step.act === 1 ? "bad" : "good"}>{step.act === 1 ? "Without Temporal" : "Real Temporal"}</Tag>}
       extra={
@@ -160,7 +160,6 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       right={<OrdersPanel panels={view.panels} />}
       caption={<TryThis text={step.tryThis} />}
       banner={<BannerLine text={bannerText} />}
-      rail={<StepRail current={step.id} />}
     />
   );
 }

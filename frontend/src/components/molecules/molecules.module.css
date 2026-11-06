@@ -107,47 +107,6 @@
   color: var(--c-dim);
 }
 
-.railItem {
-  all: unset;
-  cursor: pointer;
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-  font: 500 11px / 1.25 var(--font-mono);
-  color: var(--c-dim);
-  background: var(--c-panel);
-  min-width: 0;
-}
-.railItem b {
-  display: block;
-  font: 800 17px / 1 var(--font-display);
-  color: var(--c-ink);
-}
-.railItem small {
-  display: block;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-}
-.railItem[data-act="1"] small {
-  color: var(--c-fault);
-}
-.railItem[data-act="2"] small {
-  color: var(--c-ok);
-}
-.railItem[aria-current="step"] {
-  border-color: var(--c-gold);
-  color: var(--c-ink);
-}
-.railItem[aria-current="step"] b {
-  color: var(--c-gold);
-}
-.railItem:focus-visible {
-  outline: 2px solid var(--c-gold);
-  outline-offset: 2px;
-}
-
 .speed {
   display: inline-flex;
   align-items: center;

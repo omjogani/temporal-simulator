@@ -14,11 +14,10 @@ interface Props {
   right: ReactNode;
   caption: ReactNode;
   banner: ReactNode;
-  rail: ReactNode;
 }
 
 /** Page layout of the simulator: top bar, panel | board | panel, caption, step rail. */
-export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner, rail }: Props) {
+export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner }: Props) {
   return (
     <main className={styles.arena}>
       <header className={styles.top}>
@@ -42,7 +41,6 @@ export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, bo
       <div className={styles.foot}>
         {caption}
         {banner}
-        {rail}
       </div>
     </main>
   );
