@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NodeFrame, SvgText, clientColor, toneColor } from "@/components/atoms/svg";
 import { ChecklistRow, ShelfChip } from "@/components/molecules/svg";
 import { CLIENTS, HUB, HUB_IN, SIDE, WORKER, queueCellX } from "@/lib/geometry";
+import { workerName } from "@/lib/steps";
 import type { HubView, NodeId, SideView, WorkerCardView } from "@/lib/types";
 
 /** Makes a board node clickable and keyboard-operable. */
@@ -162,10 +163,10 @@ export function WorkerCard({ card, onHit }: { card: WorkerCardView; onHit: (n: N
   const left = cx - WORKER.w / 2;
   const top = WORKER.top;
   return (
-    <Hit node={`w:${card.id}`} label={`Worker ${card.id}`} onHit={onHit}>
+    <Hit node={`w:${card.id}`} label={`Worker ${workerName(card.id)}`} onHit={onHit}>
       <NodeFrame x={cx} y={top + WORKER.h / 2} w={WORKER.w} h={WORKER.h} down={!card.up} />
       <SvgText x={left + 14} y={top + 24} size={13.5} weight={600}>
-        Worker {card.id}
+        {workerName(card.id)}
       </SvgText>
       <SvgText x={left + WORKER.w - 14} y={top + 24} size={11} textAnchor="end" color={toneColor[card.statusTone]}>
         {card.status}
@@ -182,6 +183,11 @@ export function WorkerCard({ card, onHit }: { card: WorkerCardView; onHit: (n: N
       <SvgText x={left + 14} y={top + WORKER.h - 14} size={11} tone="dim">
         {card.footer}
       </SvgText>
+      {card.container && (
+        <SvgText x={left + WORKER.w - 14} y={top + WORKER.h - 14} size={10} textAnchor="end" color={card.up ? "var(--c-client-3)" : "var(--c-fault)"}>
+          {card.container}
+        </SvgText>
+      )}
     </Hit>
   );
 }

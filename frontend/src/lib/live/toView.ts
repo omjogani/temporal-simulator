@@ -1,7 +1,7 @@
 // Live snapshot → shared view model.
 
 import { HUB_IN } from "../geometry";
-import { COMP_NAME, SCORE_META, STEP_NAMES, type StepConfig } from "../steps";
+import { COMP_NAME, SCORE_META, STEP_NAMES, workerContainer, type StepConfig } from "../steps";
 import type {
   ArenaView,
   ChecklistRowView,
@@ -76,7 +76,8 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
       orderTone: ghost ? "dim" : o?.pauseRequested ? "gold" : "neutral",
       ghost,
       rows: o ? o.steps.map((st, i) => row(st, i, now, tUp, ghost)) : placeholder(),
-      footer: `✓ ${w.completed} orders completed`,
+      footer: `✓ ${w.completed} completed`,
+      container: workerContainer(w.id),
     };
   });
 

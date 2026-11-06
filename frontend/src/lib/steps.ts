@@ -131,6 +131,12 @@ export const SCORE_META: Record<ScoreKey, { label: string; tone: "good" | "bad" 
   paused: { label: "Paused", tone: "gold" },
 };
 
+/** Worker pet names (index = worker id - 1). Must match backend/internal/orders WorkerNames. */
+export const WORKER_NAMES = ["Biscuit", "Mochi", "Pepper", "Noodle"];
+export const workerName = (id: number) => WORKER_NAMES[id - 1] ?? `Worker ${id}`;
+/** Docker container a live worker runs in, as shown in Docker Desktop. */
+export const workerContainer = (id: number) => `worker-${workerName(id).toLowerCase()}`;
+
 export const STEP_NAMES = ["Reserve stock", "Charge card", "Ship order", "Send email"];
 export const COMP_NAME = "Release stock ↩";
 export const CLIENT_COLORS = ["#e5645c", "#5fb865", "#5ea2f0", "#d6a531"];

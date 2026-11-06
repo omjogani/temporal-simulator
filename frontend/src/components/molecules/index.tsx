@@ -1,5 +1,6 @@
 import { BigNumber, Button, Kbd, StatusDot } from "@/components/atoms";
 import type { LaneView, RetryPolicyView, ScoreItemView, WorkerRowView } from "@/lib/types";
+import { workerName } from "@/lib/steps";
 import styles from "./molecules.module.css";
 
 export function ToolButton({ label, hotkey, pressed, onClick }: { label: string; hotkey?: string; pressed?: boolean; onClick: () => void }) {
@@ -49,7 +50,7 @@ export function WorkerRow({ row }: { row: WorkerRowView }) {
   return (
     <div className={styles.workerRow}>
       <StatusDot up={row.up} />
-      <span>Worker {row.id}</span>
+      <span>{workerName(row.id)}</span>
       <em data-tone={row.noteTone}>{row.note}</em>
       <BigNumber value={row.completed} size="sm" />
     </div>

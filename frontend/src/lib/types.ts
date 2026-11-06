@@ -50,6 +50,8 @@ export interface WorkerCardView {
   ghost: boolean; // showing the order it was running when it died
   rows: ChecklistRowView[];
   footer: string;
+  /** Docker container name, on live steps where the worker really runs in Docker. */
+  container?: string;
 }
 
 export type Loc =

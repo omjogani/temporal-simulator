@@ -2,7 +2,7 @@
 // It is deliberately not real infrastructure; Act 2 is where real Temporal runs.
 
 import { HUB_IN } from "../geometry";
-import { HAMMER_MS, SCORE_META, STEP_NAMES } from "../steps";
+import { HAMMER_MS, SCORE_META, STEP_NAMES, workerName } from "../steps";
 import type { ArenaView, ChecklistRowView, DotView, NodeId, ScoreItemView, ScoreKey, ToolId, WorkerCardView } from "../types";
 
 const ACT_MS = 700;
@@ -241,13 +241,13 @@ export class QueueSim {
       w.downUntil = now + HAMMER_MS;
       const o = w.order;
       w.order = null;
-      if (!o) return this.say(`Worker ${w.id} crashed while idle.`);
+      if (!o) return this.say(`${workerName(w.id)} crashed while idle.`);
       const doneN = o.done.filter(Boolean).length;
       const stepName = STEP_NAMES[Math.min(o.cur, 3)];
       if (!this.cfg.manualAck) {
         this.lose(o);
         this.say(
-          `Worker ${w.id} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
+          `${workerName(w.id)} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
         );
         return;
       }
@@ -255,7 +255,7 @@ export class QueueSim {
       o.until = now + VIS_MS;
       w.ghost = o;
       this.say(
-        `Worker ${w.id} crashed. Order #${o.num} was never acked, so in 3 s it's redelivered and starts over at step 1${o.charged ? ". Its card is already charged" : ""}.`,
+        `${workerName(w.id)} crashed. Order #${o.num} was never acked, so in 3 s it's redelivered and starts over at step 1${o.charged ? ". Its card is already charged" : ""}.`,
       );
       return;
     }
