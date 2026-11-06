@@ -230,9 +230,6 @@ func (c *Controller) kickStarter() {
 
 // clientLoop is one client placing orders at the step's pace.
 func (c *Controller) clientLoop(ctx context.Context, client int) {
-	c.mu.Lock()
-	every := c.step.EveryMs
-	c.mu.Unlock()
 	first := time.Duration(200+rand.IntN(1500)) * time.Millisecond
 	timer := time.NewTimer(first)
 	defer timer.Stop()
@@ -243,7 +240,11 @@ func (c *Controller) clientLoop(ctx context.Context, client int) {
 		case <-timer.C:
 		}
 		c.NewOrder(client, false)
-		timer.Reset(time.Duration(every[0]+rand.IntN(every[1]-every[0]+1)) * time.Millisecond)
+		c.mu.Lock()
+		every := c.step.EveryMs
+		gap := c.scaled(every[0] + rand.IntN(every[1]-every[0]+1))
+		c.mu.Unlock()
+		timer.Reset(time.Duration(gap) * time.Millisecond)
 	}
 }
 
@@ -293,12 +294,13 @@ func (c *Controller) starterLoop(ctx context.Context) {
 			}
 		}
 		step := c.step
+		actMs, stcMs := c.scaled(step.ActivityMs), c.scaled(step.StartToCloseMs)
 		c.mu.Unlock()
 
 		for _, o := range pending {
 			in := orders.OrderInput{
 				OrderID: o.ID, Num: o.Num, Client: o.Client, Declined: o.Declined,
-				ActivityMs: step.ActivityMs, StartToCloseMs: step.StartToCloseMs, HeartbeatMs: step.HeartbeatMs, Retry: step.Retry,
+				ActivityMs: actMs, StartToCloseMs: stcMs, HeartbeatMs: step.HeartbeatMs, Retry: step.Retry,
 			}
 			sctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			_, err := c.tc.ExecuteWorkflow(sctx, client.StartWorkflowOptions{

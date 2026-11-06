@@ -76,6 +76,16 @@ func (c *Controller) routes() http.Handler {
 		c.SetSched(b.Mode)
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /api/speed", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			Speed float64 `json:"speed"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		c.SetSpeed(b.Speed)
+		writeJSON(w, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("POST /api/pause", func(w http.ResponseWriter, r *http.Request) {
 		var b struct {
 			ID string `json:"id"`

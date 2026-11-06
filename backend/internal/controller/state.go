@@ -114,6 +114,7 @@ type Snapshot struct {
 	Banner         BannerView       `json:"banner"`
 	Retry          orders.RetrySpec `json:"retry"`
 	StartToCloseMs int              `json:"startToCloseMs"`
+	Speed          float64          `json:"speed"`
 	TemporalUI     string           `json:"temporalUi"`
 }
 

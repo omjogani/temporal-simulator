@@ -56,6 +56,7 @@ type Controller struct {
 	tDownUntil time.Time
 	pay        payments
 	sched      string
+	speed      float64 // visual/time scale: 0.25 (slow) … 2 (fast); kept across steps
 	waits      [4][]time.Duration
 	clientDone [4]int
 	stats      StatsView
@@ -80,6 +81,7 @@ func New(cfg Config) (*Controller, error) {
 		startKick: make(chan struct{}, 1),
 		step:      steps.Get(1),
 		pay:       newPayments(),
+		speed:     1,
 	}
 	for i := 1; i <= numWorkers; i++ {
 		c.workers[i] = &workerProc{id: i}
@@ -127,6 +129,30 @@ func randomID(n int) string {
 }
 
 // say sets the banner line shown under the board. Caller holds mu.
+// scaled divides a duration in ms by the speed. Caller holds mu.
+func (c *Controller) scaled(ms int) int {
+	return int(float64(ms) / c.speed)
+}
+
+// SetSpeed scales activity durations, client pace, the start-to-close timeout
+// and slow-Payments delay for orders started from now on. Hammer outages and
+// retry backoff stay in real seconds.
+func (c *Controller) SetSpeed(v float64) {
+	if v < 0.25 {
+		v = 0.25
+	}
+	if v > 2 {
+		v = 2
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if v == c.speed {
+		return
+	}
+	c.speed = v
+	c.say("Speed %.2gx: new orders run activities of %.1f s.", v, float64(c.scaled(c.step.ActivityMs))/1000)
+}
+
 func (c *Controller) say(format string, args ...any) {
 	c.banner.Seq++
 	c.banner.Text = fmt.Sprintf(format, args...)
@@ -231,7 +257,8 @@ func (c *Controller) snapshot() []byte {
 		Sched:          c.sched,
 		Banner:         c.banner,
 		Retry:          c.step.Retry,
-		StartToCloseMs: c.step.StartToCloseMs,
+		StartToCloseMs: c.scaled(c.step.StartToCloseMs),
+		Speed:          c.speed,
 		TemporalUI:     c.cfg.TemporalUI,
 		Stats:          c.stats,
 		Orders:         []*Order{},

@@ -40,10 +40,11 @@ func (c *Controller) handleCharge(w http.ResponseWriter, r *http.Request) {
 	}
 	c.mu.Lock()
 	slow := time.Now().Before(c.pay.slowUntil)
+	slowFor := time.Duration(c.scaled(5000)) * time.Millisecond
 	c.mu.Unlock()
 	if slow {
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(slowFor):
 		case <-r.Context().Done(): // the activity hit its start-to-close timeout
 			c.mu.Lock()
 			c.pay.failures++
@@ -92,6 +93,7 @@ func (c *Controller) SetPayments(mode string) {
 		c.say("Payments API returns 500s for 10 s. Charge card retries with backoff: 1 s, 2 s, 4 s, 8 s.")
 	case "slow":
 		c.pay.slowUntil = until
-		c.say("Payments API takes 5 s per call for 10 s. The start-to-close timeout is %d s, so calls time out and retry.", c.step.StartToCloseMs/1000)
+		c.say("Payments API takes %.1f s per call for 10 s. The start-to-close timeout is %.1f s, so calls time out and retry.",
+			float64(c.scaled(5000))/1000, float64(c.scaled(c.step.StartToCloseMs))/1000)
 	}
 }
