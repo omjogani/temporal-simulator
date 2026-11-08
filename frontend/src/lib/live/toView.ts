@@ -147,7 +147,6 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
     inflight: s.stats.inflight,
     lost: s.stats.lost,
     dup: s.stats.duplicates,
-    dlq: 0,
     failed: s.stats.failed,
     paused: s.stats.paused,
   };

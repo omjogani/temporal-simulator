@@ -6,7 +6,7 @@ export interface StepConfig {
   name: string;
   live: boolean; // backed by real Temporal through the Go controller
   hub: string;
-  side: "dlq" | "paused" | null;
+  side: "paused" | null;
   lanes: boolean;
   tools: ToolId[];
   actions: (ActionId | "sched")[];
@@ -103,7 +103,6 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   paySlow: { label: "🐌 Payments slow", key: "S" },
   pauseAll: { label: "Pause all" },
   resumeAll: { label: "Resume all" },
-  recap: { label: "Recap" },
   reset: { label: "Reset", key: "R" },
 };
 
@@ -112,7 +111,6 @@ export const SCORE_META: Record<ScoreKey, { label: string; tone: "good" | "bad" 
   inflight: { label: "In flight", tone: "neutral" },
   lost: { label: "Lost", tone: "bad" },
   dup: { label: "Duplicate charges", tone: "bad" },
-  dlq: { label: "Dead letters", tone: "bad" },
   failed: { label: "Failed cleanly", tone: "gold" },
   paused: { label: "Paused", tone: "gold" },
 };

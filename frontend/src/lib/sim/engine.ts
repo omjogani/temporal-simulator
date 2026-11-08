@@ -1,4 +1,5 @@
-// Act 1: an in-browser illustration of a homemade queue system.
+// Act 1: an in-browser illustration of a plain in-memory queue that deletes
+// each order as soon as it hands it to a worker (auto-ack).
 // It is deliberately not real infrastructure; Act 2 is where real Temporal runs.
 
 import { HUB_IN } from "../geometry";
@@ -7,11 +8,9 @@ import type { ArenaView, ChecklistRowView, DotView, NodeId, ScoreItemView, Score
 
 const ACT_MS = 700;
 const EVERY: [number, number] = [2600, 3800];
-const VIS_MS = 3000; // visibility timeout before an unacked order is redelivered
-const MAX_ATTEMPTS = 3;
 const CHARGE = 1;
 
-type OState = "queued" | "fetching" | "running" | "limbo" | "dlq" | "done" | "lost";
+type OState = "queued" | "fetching" | "running" | "done" | "lost";
 
 interface SimOrder {
   id: string;
@@ -22,10 +21,7 @@ interface SimOrder {
   done: boolean[];
   cur: number;
   t: number; // ms spent in the current state
-  tried: boolean;
-  charged: number;
-  attempts: number;
-  until: number;
+  charged: boolean;
   endedAt: number;
 }
 
@@ -33,15 +29,10 @@ interface SimWorker {
   id: number;
   downUntil: number;
   order: SimOrder | null;
-  ghost: SimOrder | null;
   completed: number;
 }
 
 export interface SimConfig {
-  step: 1 | 2;
-  durable: boolean;
-  manualAck: boolean;
-  dlq: boolean;
   score: ScoreKey[];
   hub: string;
 }
@@ -63,21 +54,18 @@ export class QueueSim {
   private num = 0;
   private orders: SimOrder[] = [];
   private queue: SimOrder[] = [];
-  private dlqList: SimOrder[] = [];
   private workers: SimWorker[];
   private nextAt = [0, 0, 0, 0];
   /** Clients only place orders after the presenter presses Play. */
   running = false;
   private hubDown = 0;
-  private payDown = 0;
-  private charges = 0;
-  private stats = { done: 0, lost: 0, dup: 0, dlq: 0 };
+  private stats = { done: 0, lost: 0 };
   private banner = { seq: 0, text: "" };
 
   constructor(cfg: SimConfig) {
     this.cfg = cfg;
-    this.rng = mulberry32(0xc0de00 + cfg.step * 7919);
-    this.workers = [1, 2, 3, 4].map((id) => ({ id, downUntil: 0, order: null, ghost: null, completed: 0 }));
+    this.rng = mulberry32(0xc0de00 + 7919);
+    this.workers = [1, 2, 3, 4].map((id) => ({ id, downUntil: 0, order: null, completed: 0 }));
     this.nextAt = this.nextAt.map(() => 200 + this.rng() * 1500);
   }
 
@@ -96,10 +84,7 @@ export class QueueSim {
       done: [false, false, false, false],
       cur: 0,
       t: 0,
-      tried: false,
-      charged: 0,
-      attempts: 0,
-      until: 0,
+      charged: false,
       endedAt: 0,
     };
     this.orders.push(o);
@@ -117,20 +102,9 @@ export class QueueSim {
     this.stats.lost++;
   }
 
-  private restart(o: SimOrder) {
-    o.done = [false, false, false, false];
-    o.cur = 0;
-  }
-
-  private charge(o: SimOrder) {
-    o.charged++;
-    this.charges++;
-    if (o.charged > 1) this.stats.dup++;
-  }
-
   /**
-   * Advance the simulation. `now` is real time, so outages (10 s) and the
-   * redelivery timeout always last their stated seconds; `speed` only scales
+   * Advance the simulation. `now` is real time, so outages (10 s) always
+   * last their stated seconds; `speed` only scales
    * how fast orders move: client pace, fetching and each activity.
    */
   tick(dt: number, speed = 1) {
@@ -147,7 +121,6 @@ export class QueueSim {
         if (w.downUntil <= now && !w.order && this.queue.length) {
           const o = this.queue.shift()!;
           w.order = o;
-          w.ghost = null;
           o.worker = w.id;
           o.state = "fetching";
           o.t = 0;
@@ -162,24 +135,15 @@ export class QueueSim {
           if (o.t >= 450) {
             o.state = "running";
             o.t = 0;
-            o.tried = false;
           }
           break;
         case "running": {
           if (!w) break;
-          if (o.cur === CHARGE && !o.tried && o.t >= ACT_MS / 2) {
-            o.tried = true;
-            if (now < this.payDown) {
-              this.fail(o, w);
-              break;
-            }
-            this.charge(o);
-          }
+          if (o.cur === CHARGE && o.t >= ACT_MS / 2) o.charged = true;
           if (o.t >= ACT_MS) {
             o.done[o.cur] = true;
             o.cur++;
             o.t = 0;
-            o.tried = false;
             if (o.cur >= 4) {
               w.order = null;
               w.completed++;
@@ -190,35 +154,9 @@ export class QueueSim {
           }
           break;
         }
-        case "limbo":
-          if (now >= o.until) {
-            if (w && w.ghost === o) w.ghost = null;
-            this.restart(o);
-            o.state = "queued";
-            o.worker = 0;
-            this.queue.unshift(o);
-          }
-          break;
       }
     }
     this.orders = this.orders.filter((o) => !(o.state === "done" || o.state === "lost") || now - o.endedAt < 1500);
-  }
-
-  private fail(o: SimOrder, w: SimWorker) {
-    w.order = null;
-    o.attempts++;
-    if (o.attempts >= MAX_ATTEMPTS) {
-      o.state = "dlq";
-      o.worker = 0;
-      this.dlqList.push(o);
-      this.stats.dlq++;
-      this.say(`Order #${o.num} failed ${o.attempts} times. Moved to dead letters for someone to look at.`);
-      return;
-    }
-    this.restart(o);
-    o.state = "queued";
-    o.worker = 0;
-    this.queue.unshift(o);
   }
 
   hit(node: NodeId, tool: ToolId) {
@@ -226,14 +164,10 @@ export class QueueSim {
     if (node === "hub") {
       if (tool !== "hammer") return;
       this.hubDown = now + HAMMER_MS;
-      if (!this.cfg.durable) {
-        const n = this.queue.length;
-        this.queue.forEach((o) => this.lose(o));
-        this.queue = [];
-        this.say(`The queue lived in memory. ${n} waiting orders are gone, and new orders fail for 10 s.`);
-      } else {
-        this.say("Queue down for 10 s. Stored messages survive, but new orders fail and workers can't fetch.");
-      }
+      const n = this.queue.length;
+      this.queue.forEach((o) => this.lose(o));
+      this.queue = [];
+      this.say(`The queue lived in memory. ${n} waiting orders are gone, and new orders fail for 10 s.`);
       return;
     }
     if (node.startsWith("w:")) {
@@ -246,28 +180,13 @@ export class QueueSim {
       if (!o) return this.say(`${workerName(w.id)} crashed while idle.`);
       const doneN = o.done.filter(Boolean).length;
       const stepName = STEP_NAMES[Math.min(o.cur, 3)];
-      if (!this.cfg.manualAck) {
-        this.lose(o);
-        this.say(
-          `${workerName(w.id)} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
-        );
-        return;
-      }
-      o.state = "limbo";
-      o.until = now + VIS_MS;
-      w.ghost = o;
+      this.lose(o);
       this.say(
-        `${workerName(w.id)} crashed. Order #${o.num} was never acked, so in 3 s it's redelivered and starts over at step 1${o.charged ? ". Its card is already charged" : ""}.`,
+        `${workerName(w.id)} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
       );
       return;
     }
     if (node.startsWith("c:")) this.say("Those are your customers. Please don't hammer them.");
-  }
-
-  /** Payments API returns 500s for 10 s. */
-  paymentsDown() {
-    this.payDown = this.now + HAMMER_MS;
-    this.say("Payments API returns 500s for 10 s.");
   }
 
   setRunning(run: boolean) {
@@ -287,13 +206,11 @@ export class QueueSim {
     const cfg = this.cfg;
     const workers: WorkerCardView[] = this.workers.map((w) => {
       const down = now < w.downUntil;
-      const o = w.order ?? w.ghost;
-      const ghost = !w.order && !!w.ghost;
+      const o = w.order;
       const rows: ChecklistRowView[] = STEP_NAMES.map((label, i) => {
         if (!o) return { label, state: "placeholder" };
         if (o.done[i]) return { label, state: "done" };
-        if (i === o.cur && !ghost && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / ACT_MS) };
-        if (i === o.cur && ghost) return { label, state: "interrupted", meta: "redeliver", metaTone: "gold" };
+        if (i === o.cur && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / ACT_MS) };
         return { label, state: "pending" };
       });
       let status = "idle";
@@ -312,31 +229,29 @@ export class QueueSim {
         downLeftMs: Math.max(0, w.downUntil - now),
         status,
         statusTone,
-        orderLabel: o ? `Order #${o.num}${ghost ? " · unacked" : ""}` : undefined,
-        orderTone: ghost ? "dim" : "neutral",
-        ghost,
+        orderLabel: o ? `Order #${o.num}` : undefined,
+        orderTone: "neutral",
+        ghost: false,
         rows,
         footer: `✓ ${w.completed} orders completed`,
       };
     });
 
     const dots: DotView[] = [];
-    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: o.charged ? (o.charged > 1 ? "dup" : "charged") : "none", hidden: i >= HUB_IN.cells }));
-    this.dlqList.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "side", slot: i }, ring: "none", hidden: i > 15 }));
+    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: "none", hidden: i >= HUB_IN.cells }));
     for (const o of this.orders) {
-      if (o.state === "fetching" || o.state === "running" || o.state === "limbo")
-        dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.state === "limbo" ? "ghost" : o.charged > 1 ? "dup" : o.charged ? "charged" : "none", ghost: o.state === "limbo" });
+      if (o.state === "fetching" || o.state === "running")
+        dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.charged ? "charged" : "none" });
       else if (o.state === "done")
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: "done", fate: "done" });
       else if (o.state === "lost") dots.push({ id: o.id, client: o.client, loc: { kind: "gone" }, ring: "none", fate: "lost" });
     }
 
-    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost" && o.state !== "dlq").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, dlq: this.stats.dlq, failed: 0, paused: 0 };
+    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: 0, paused: 0 };
     const score: ScoreItemView[] = cfg.score.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
 
     const hubDown = now < this.hubDown;
-    const payDown = now < this.payDown;
     return {
       hub: {
         label: cfg.hub,
@@ -346,13 +261,10 @@ export class QueueSim {
         info: hubDown ? `DOWN · ${Math.ceil((this.hubDown - now) / 1000)}s` : `waiting ${this.queue.length}`,
         more: this.queue.length > HUB_IN.cells ? `+${this.queue.length - HUB_IN.cells} more` : undefined,
         lanes: false,
-        store: cfg.durable ? "disk" : "memory",
+        store: "memory",
       },
-      payments: {
-        state: payDown ? "down" : "ok",
-        leftMs: Math.max(0, this.payDown - now),
-      },
-      side: cfg.dlq ? { kind: "dlq", count: this.dlqList.length, chips: [] } : null,
+      payments: { state: "ok", leftMs: 0 },
+      side: null,
       workers,
       dots,
       panels: {
@@ -369,8 +281,3 @@ export class QueueSim {
     };
   }
 }
-
-export const simConfigFor = (step: 1 | 2, score: ScoreKey[], hub: string): SimConfig =>
-  step === 1
-    ? { step, durable: false, manualAck: false, dlq: false, score, hub }
-    : { step, durable: true, manualAck: true, dlq: true, score, hub };

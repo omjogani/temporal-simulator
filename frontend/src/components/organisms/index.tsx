@@ -137,33 +137,11 @@ export function BannerLine({ text }: { text: string }) {
   );
 }
 
-export function RecapCard({ onClose }: { onClose: () => void }) {
-  return (
-    <div className={styles.card}>
-      <button type="button" className={styles.close} onClick={onClose} aria-label="Hide recap">
-        hide ✕
-      </button>
-      <h5>What we built for a queue</h5>
-      <ul>
-        <li className={styles.y}>A durable broker to run and monitor</li>
-        <li className={styles.y}>Acks and a visibility timeout to tune</li>
-        <li className={styles.y}>A retry policy</li>
-        <li className={styles.y}>A dead-letter queue, and someone to drain it</li>
-        <li className={styles.n}>Resuming from the step that failed (we restart from zero)</li>
-        <li className={styles.n}>Idempotency keys on every side effect</li>
-        <li className={styles.n}>Undoing earlier steps when a later one fails</li>
-        <li className={styles.n}>An answer to “where is order #42 right now?”</li>
-      </ul>
-      <p>Next: the same board, with real Temporal in the middle.</p>
-    </div>
-  );
-}
-
 export function ConnectionNotice() {
   return (
     <div className={`${styles.card} ${styles.notice}`} role="status">
       <h5>Backend not connected</h5>
-      <p>Steps 3–6 run on real Temporal through the Go controller. Start them with:</p>
+      <p>Steps 2–5 run on real Temporal through the Go controller. Start them with:</p>
       <p>
         <code>docker compose up -d</code>
         <br />

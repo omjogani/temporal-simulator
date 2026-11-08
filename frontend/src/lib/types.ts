@@ -13,11 +13,10 @@ export type ActionId =
   | "paySlow"
   | "pauseAll"
   | "resumeAll"
-  | "recap"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
 export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}`;
-export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "dlq" | "failed" | "paused";
+export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused";
 
 export type RowState =
   | "placeholder"
@@ -83,8 +82,8 @@ export interface HubView {
   info: string;
   more?: string;
   lanes: boolean;
-  /** Where the hub keeps its state: plain queue in RAM, queue on disk, or Temporal history. */
-  store: "memory" | "disk" | "history";
+  /** Where the hub keeps its state: plain queue in RAM or Temporal history. */
+  store: "memory" | "history";
 }
 
 export interface PaymentsView {
@@ -99,7 +98,7 @@ export interface ShelfChip {
 }
 
 export interface SideView {
-  kind: "dlq" | "paused";
+  kind: "paused";
   count: number;
   chips: ShelfChip[];
 }

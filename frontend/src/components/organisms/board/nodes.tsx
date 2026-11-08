@@ -41,11 +41,10 @@ export function ClientNode({ index, wide, onHit }: { index: number; wide: boolea
 }
 
 function StoreIcon({ x, y, kind }: { x: number; y: number; kind: HubView["store"] }) {
-  const stroke = kind === "memory" ? "var(--c-fault)" : "var(--c-ok)";
   if (kind === "memory")
     // a RAM chip: gone when the process dies
     return (
-      <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke }}>
+      <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke: "var(--c-fault)" }}>
         <rect x={-7} y={-6} width={14} height={12} rx={2} />
         {[-4, 0, 4].map((d) => (
           <path key={d} d={`M${d} -9v3M${d} 6v3`} />
@@ -54,7 +53,7 @@ function StoreIcon({ x, y, kind }: { x: number; y: number; kind: HubView["store"
     );
   // a disk cylinder: survives a crash
   return (
-    <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke }}>
+    <g transform={`translate(${x},${y})`} fill="none" strokeWidth={1.5} style={{ stroke: "var(--c-ok)" }}>
       <ellipse cx={0} cy={-6} rx={7} ry={2.5} />
       <path d="M-7 -6v11a7 2.5 0 0 0 14 0v-11M-7 -0.5a7 2.5 0 0 0 14 0" />
     </g>
@@ -63,7 +62,6 @@ function StoreIcon({ x, y, kind }: { x: number; y: number; kind: HubView["store"
 
 const STORE_TEXT: Record<HubView["store"], string> = {
   memory: "in memory · wiped on crash",
-  disk: "messages on disk",
   history: "history in Postgres",
 };
 
@@ -138,15 +136,14 @@ export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => vo
 export function SideNode({ side, onHit, onResume }: { side: SideView; onHit: (n: NodeId) => void; onResume: (id: string) => void }) {
   const left = SIDE.x - SIDE.w / 2;
   const top = SIDE.y - SIDE.h / 2;
-  const isDlq = side.kind === "dlq";
   return (
     <g>
-      <Hit node="side" label={isDlq ? "Dead letters" : "Paused orders"} onHit={onHit}>
+      <Hit node="side" label="Paused orders" onHit={onHit}>
         <NodeFrame x={SIDE.x} y={SIDE.y} w={SIDE.w} h={SIDE.h} />
-        <SvgText x={left + 12} y={top + 20} size={11} letterSpacing={1} tone={isDlq ? "bad" : "gold"}>
-          {isDlq ? "DEAD LETTERS" : "PAUSED"}
+        <SvgText x={left + 12} y={top + 20} size={11} letterSpacing={1} tone="gold">
+          PAUSED
         </SvgText>
-        <SvgText x={left + SIDE.w - 12} y={top + 20} textAnchor="end" tone={isDlq ? "bad" : "gold"}>
+        <SvgText x={left + SIDE.w - 12} y={top + 20} textAnchor="end" tone="gold">
           {side.count}
         </SvgText>
       </Hit>

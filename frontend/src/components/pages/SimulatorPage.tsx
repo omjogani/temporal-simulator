@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
-import { BannerLine, Board, ConnectionNotice, OrdersPanel, RecapCard, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
+import { BannerLine, Board, ConnectionNotice, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
-import { QueueSim, simConfigFor } from "@/lib/sim/engine";
+import { QueueSim } from "@/lib/sim/engine";
 import { STEPS, getStep } from "@/lib/steps";
 import type { ActionId, ArenaView, NodeId, SchedMode, ToolId } from "@/lib/types";
 import { useFrameLoop } from "@/lib/useFrameLoop";
@@ -24,11 +24,10 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   const router = useRouter();
   const [tool, setTool] = useState<ToolId>(step.tools[0]);
   const [frozen, setFrozen] = useState(false);
-  const [recap, setRecap] = useState(false);
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
   // Act 1: one simulation per step (the page is keyed by step); Reset swaps it.
-  const newSim = () => (step.live ? null : new QueueSim(simConfigFor(1, step.score, step.hub)));
+  const newSim = () => (step.live ? null : new QueueSim({ score: step.score, hub: step.hub }));
   const [sim, setSim] = useState<QueueSim | null>(newSim);
 
   // Act 2: live snapshots from the Go controller (real Temporal).
@@ -79,13 +78,10 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     if (a === "reset") {
       if (step.live) void api.step(step.id, true);
       else setSim(newSim());
-      setRecap(false);
       return;
     }
-    if (a === "recap") return setRecap((r) => !r);
     if (!step.live) {
       if (a === "flood") sim?.flood();
-      else if (a === "payDown") sim?.paymentsDown();
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);
@@ -168,7 +164,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       }
       left={<WorkersPanel panels={view.panels} />}
       board={<Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} />}
-      overlay={step.live && !view.connected ? <ConnectionNotice /> : recap ? <RecapCard onClose={() => setRecap(false)} /> : undefined}
+      overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
       right={<OrdersPanel panels={view.panels} />}
       caption={<TryThis text={step.tryThis} />}
       banner={<BannerLine text={bannerText} />}
