@@ -31,20 +31,6 @@ export const STEPS: StepConfig[] = [
   },
   {
     id: 2,
-    act: 1,
-    name: "Hardened queue",
-    live: false,
-    hub: "Message queue",
-    side: "dlq",
-    lanes: false,
-    tools: ["hammer"],
-    actions: ["flood", "payDown", "recap"],
-    score: ["done", "inflight", "lost", "dup", "dlq"],
-    tryThis:
-      "Hammer a worker after ✓ Charge card. 3 s later the order is redelivered and starts over at step 1, so the card is charged twice. Take Payments down: orders retry straight away, restart each time, and end up in dead letters. Open Recap at the end.",
-  },
-  {
-    id: 3,
     act: 2,
     name: "Durability",
     live: true,
@@ -58,7 +44,7 @@ export const STEPS: StepConfig[] = [
       "Hammer a worker mid-order: its ticks are kept and Temporal retries the step on a healthy worker. Hammer all workers, or hammer the Temporal Service itself, for 10 s. Everything waits, then continues. Lost stays at 0.",
   },
   {
-    id: 4,
+    id: 3,
     act: 2,
     name: "Timeouts & retries",
     live: true,
@@ -72,7 +58,7 @@ export const STEPS: StepConfig[] = [
       "Take Payments down for 10 s: Charge card retries after 1, 2, 4 and 8 s, with the retry timer held by Temporal, then succeeds once Payments is back. Make Payments slow: calls take 5 s, hit the 3 s timeout and retry. Send a declined card: it's non-retryable, so the order fails fast and releases its stock.",
   },
   {
-    id: 5,
+    id: 4,
     act: 2,
     name: "Priority & fairness",
     live: true,
@@ -86,7 +72,7 @@ export const STEPS: StepConfig[] = [
       "Pick a mode first, then send a bulk import from Client 4. FIFO: everyone waits behind it. Priority: Client 1 (VIP) jumps ahead. Fairness: every client gets its turn. Modes apply to orders placed after you switch.",
   },
   {
-    id: 6,
+    id: 5,
     act: 2,
     name: "Pause & resume",
     live: true,

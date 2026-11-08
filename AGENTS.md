@@ -14,11 +14,10 @@ The talk has two acts, one URL per step:
 | Route | Act | Topic | Backed by |
 |---|---|---|---|
 | `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost | In-browser illustration |
-| `/2` | Without Temporal | Hardened queue (durable, acks, retries, DLQ): duplicates, restarts from step 1 | In-browser illustration |
-| `/3` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
-| `/4` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
-| `/5` | Temporal | Task queue priority and fairness | **Real Temporal** |
-| `/6` | Temporal | Pause and resume workflows | **Real Temporal** |
+| `/2` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
+| `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
+| `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
+| `/5` | Temporal | Pause and resume workflows | **Real Temporal** |
 
 Rule: anything shown in Act 2 must be real Temporal behaviour, not simulated. Act 1 is allowed
 to be a pure illustration.
@@ -35,7 +34,7 @@ temporal/dynamicconfig.yaml  priority + fairness switches for the server
 backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
-  internal/steps/         per-step config for the live steps (3-6)
+  internal/steps/         per-step config for the live steps (2-5)
   internal/controller/    HTTP + WebSocket API, worker container manager, docker hammer,
                           fake Payments API, client load generator, state registry
 frontend/                 Next.js (App Router, TypeScript), atomic design

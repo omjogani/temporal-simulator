@@ -208,7 +208,7 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
       })),
       service: { label: "Temporal Service", up: tUp, note: tUp ? "●" : tLeft > 0 ? secs(tLeft) : "starting…" },
       retry:
-        cfg.id === 4
+        cfg.id === 3
           ? {
               startToClose: `${s.startToCloseMs / 1000}s`,
               backoff: backoffSteps.join("→") + "s",

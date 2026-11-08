@@ -28,7 +28,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
   // Act 1: one simulation per step (the page is keyed by step); Reset swaps it.
-  const newSim = () => (step.live ? null : new QueueSim(simConfigFor(step.id as 1 | 2, step.score, step.hub)));
+  const newSim = () => (step.live ? null : new QueueSim(simConfigFor(1, step.score, step.hub)));
   const [sim, setSim] = useState<QueueSim | null>(newSim);
 
   // Act 2: live snapshots from the Go controller (real Temporal).

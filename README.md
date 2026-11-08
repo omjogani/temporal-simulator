@@ -8,11 +8,10 @@ take the Payments API down, flood the system. The scoreboards show what survives
 | Route | Act | What it shows | Backed by |
 |---|---|---|---|
 | `/1` | Without Temporal | Plain in-memory queue: crashes lose orders halfway | Browser illustration |
-| `/2` | Without Temporal | Hardened queue: redelivery restarts from step 1 and charges twice; dead letters | Browser illustration |
-| `/3` | Temporal | Durability: kill workers or the Temporal server for 10 s, nothing is lost | Real Temporal |
-| `/4` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | Real Temporal |
-| `/5` | Temporal | Task queue priority and fairness | Real Temporal |
-| `/6` | Temporal | Pause and resume workflows | Real Temporal |
+| `/2` | Temporal | Durability: kill workers or the Temporal server for 10 s, nothing is lost | Real Temporal |
+| `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | Real Temporal |
+| `/4` | Temporal | Task queue priority and fairness | Real Temporal |
+| `/5` | Temporal | Pause and resume workflows | Real Temporal |
 
 ## Run it
 
@@ -27,9 +26,9 @@ Open <http://localhost:13000/1>. Use ← → to move between steps.
 
 Every step loads paused: press **▶ Play** (or Space) to start the clients placing orders, and
 again to pause them (orders in flight finish). The **Speed** slider (or `-` / `+`) changes how fast orders move, from 0.25× to 2×: dot travel,
-client pace and activity time. On `/3`–`/6` the controller does this for real by scaling activity
+client pace and activity time. On `/2`–`/5` the controller does this for real by scaling activity
 durations, client pace, the start-to-close timeout and the slow-Payments delay for new orders.
-Outages always run in real seconds: the 10 s hammer, the 3 s redelivery in `/2` and the retry
+Outages always run in real seconds: the 10 s hammer and the retry
 backoff (1→2→4→8 s).
 
 ## How it works

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { SimulatorPage } from "@/components/pages/SimulatorPage";
 import { STEPS } from "@/lib/steps";
 
-export const dynamicParams = false; // only /1 … /6
+export const dynamicParams = false; // only /1 … /5
 
 export function generateStaticParams() {
   return STEPS.map((s) => ({ step: String(s.id) }));
