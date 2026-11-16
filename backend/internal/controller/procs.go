@@ -186,6 +186,13 @@ func (c *Controller) dockerWatchLoop(stop <-chan struct{}) {
 			return
 		case <-t.C:
 		}
+		// A kill or restart that lands while docker inspect runs makes its answer stale.
+		var gens [numWorkers + 1]int
+		c.mu.Lock()
+		for i := 1; i <= numWorkers; i++ {
+			gens[i] = c.workers[i].gen
+		}
+		c.mu.Unlock()
 		args := append([]string{"inspect", "-f", "{{.Name}} {{.State.Running}}"}, names...)
 		out, _ := exec.Command("docker", args...).Output()
 		running := map[string]bool{}
@@ -199,7 +206,7 @@ func (c *Controller) dockerWatchLoop(stop <-chan struct{}) {
 		for i := 1; i <= numWorkers; i++ {
 			w := c.workers[i]
 			r, known := running[containerOf(i)]
-			if !known {
+			if !known || w.gen != gens[i] {
 				continue
 			}
 			switch {
