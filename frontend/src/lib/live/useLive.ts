@@ -40,9 +40,12 @@ export function useLive(step: number, enabled: boolean): LiveState {
       };
       ws.onerror = () => ws?.close();
     };
-    connect();
+    // Deferred so React strict mode's mount → unmount → mount never closes a socket
+    // that is still connecting (the browser warns about that).
+    const start = setTimeout(connect, 0);
     return () => {
       closed = true;
+      clearTimeout(start);
       clearTimeout(retry);
       ws?.close();
     };

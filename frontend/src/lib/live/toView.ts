@@ -16,6 +16,12 @@ import type { SnapOrder, SnapStep, Snapshot } from "./snapshot";
 const secs = (ms: number) => `${Math.max(0, Math.ceil(ms / 1000))}s`;
 const LANE_LABELS = ["C1 VIP", "C2", "C3", "C4 bulk"];
 
+/** Share of a running activity done, 0..1. Clamped: the browser's estimate of server time can lag `startedAt`. */
+export function stepProgress(now: number, startedAt: number | undefined, durationMs: number | undefined): number {
+  if (!startedAt || !durationMs) return 0;
+  return Math.min(1, Math.max(0, (now - startedAt) / durationMs));
+}
+
 function row(st: SnapStep, i: number, now: number, temporalUp: boolean, ghost: boolean): ChecklistRowView {
   const label = i < STEP_NAMES.length ? STEP_NAMES[i] : COMP_NAME;
   const comp = i >= STEP_NAMES.length;
@@ -25,7 +31,7 @@ function row(st: SnapStep, i: number, now: number, temporalUp: boolean, ghost: b
     case "reporting":
       return { label, state: "reporting", comp, meta: temporalUp ? undefined : "on hold", metaTone: "gold" };
     case "running": {
-      const progress = st.startedAt && st.durationMs ? Math.min(1, (now - st.startedAt) / st.durationMs) : 0;
+      const progress = stepProgress(now, st.startedAt, st.durationMs);
       return { label, state: ghost ? "interrupted" : "running", comp, progress, meta: st.attempt > 1 ? `attempt ${st.attempt}` : undefined, metaTone: "gold" };
     }
     case "backoff":

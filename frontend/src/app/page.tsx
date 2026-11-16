@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { MenuPage } from "@/components/pages/MenuPage";
 
 export default function Home() {
-  redirect("/1");
+  return <MenuPage />;
 }

@@ -1,0 +1,101 @@
+/* Keyframes for board art: lamps, belts, parcels, pets. Reduced motion is handled in globals.css. */
+
+/* Retry ring around a parcel waiting for its next attempt. */
+.spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Conveyor belt centre line: dashes travel toward the end of the path. */
+.belt {
+  animation: belt 1.2s linear infinite;
+}
+@keyframes belt {
+  from { stroke-dashoffset: 16; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* ---- pets ---- */
+.bobSlow {
+  animation: bob 2.4s ease-in-out infinite;
+  --bob: -1.5px;
+}
+.bobFast {
+  animation: bob 0.6s ease-in-out infinite;
+  --bob: -2px;
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(var(--bob)); }
+}
+.blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 4s infinite;
+}
+@keyframes blink {
+  0%, 96%, 100% { transform: scaleY(1); }
+  97.5% { transform: scaleY(0.1); }
+}
+.pawL,
+.pawR {
+  animation: paw 0.6s ease-in-out infinite;
+}
+.pawR {
+  animation-delay: -0.3s;
+}
+@keyframes paw {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.wake {
+  transform-box: fill-box;
+  transform-origin: 50% 80%;
+  animation: wake 0.25s ease-in-out infinite;
+}
+@keyframes wake {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+/* Stars circling a knocked-out pet's head, on a flat ellipse. */
+.orbit {
+  animation: orbit 1.6s linear infinite;
+}
+@keyframes orbit {
+  0% { transform: translate(14px, 0); animation-timing-function: ease-out; }
+  25% { transform: translate(0, 4.5px); animation-timing-function: ease-in; }
+  50% { transform: translate(-14px, 0); animation-timing-function: ease-out; }
+  75% { transform: translate(0, -4.5px); animation-timing-function: ease-in; }
+  100% { transform: translate(14px, 0); }
+}
+
+/* A cheap lamp in the Act 1 shed. */
+.flicker {
+  animation: flicker 4s steps(1, end) infinite;
+}
+@keyframes flicker {
+  0%, 18%, 22%, 61%, 63%, 100% { opacity: 1; }
+  20% { opacity: 0.35; }
+  62% { opacity: 0.55; }
+}
+
+/* The Postgres vault (and the RAM chip while it lives) breathe softly. */
+.vaultGlow {
+  animation: glow 2s ease-in-out infinite;
+}
+@keyframes glow {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.4; }
+}
+/* "starting…" on the hub. */
+.pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

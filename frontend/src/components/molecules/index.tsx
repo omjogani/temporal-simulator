@@ -1,9 +1,20 @@
+import type { ReactNode } from "react";
 import { BigNumber, Button, Kbd, StatusDot } from "@/components/atoms";
 import type { LaneView, RetryPolicyView, ScoreItemView, WorkerRowView } from "@/lib/types";
+import { PetSprite } from "@/components/atoms/PetSprite";
+import { PETS } from "@/lib/pets";
 import { workerName } from "@/lib/steps";
 import styles from "./molecules.module.css";
 
-export function ToolButton({ label, hotkey, pressed, onClick }: { label: string; hotkey?: string; pressed?: boolean; onClick: () => void }) {
+export function ToolButton({ label, hotkey, pressed, onClick, icon, caption }: { label: string; hotkey?: string; pressed?: boolean; onClick: () => void; icon?: ReactNode; caption?: string }) {
+  if (icon)
+    return (
+      <button type="button" className={styles.toolTile} aria-pressed={pressed} aria-label={label} title={label} onClick={onClick}>
+        <span className={styles.toolIcon}>{icon}</span>
+        <span className={styles.toolLabel}>{caption ?? label}</span>
+        {hotkey && <Kbd>{hotkey}</Kbd>}
+      </button>
+    );
   return (
     <Button pressed={pressed} onClick={onClick}>
       {label}
@@ -60,7 +71,12 @@ export function WorkerRow({ row }: { row: WorkerRowView }) {
   return (
     <div className={styles.workerRow}>
       <StatusDot up={row.up} />
-      <span>{workerName(row.id)}</span>
+      <span className={styles.petName}>
+        <svg className={styles.petHead} viewBox="-22 -58 44 46" aria-hidden>
+          <PetSprite species={PETS[row.id].species} color={PETS[row.id].color} pose={row.up ? "idle" : "ko"} x={0} y={0} downLeftMs={1} downTotalMs={1} />
+        </svg>
+        {workerName(row.id)}
+      </span>
       <em data-tone={row.noteTone}>{row.note}</em>
       <BigNumber value={row.completed} size="sm" />
     </div>

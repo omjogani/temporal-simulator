@@ -1,4 +1,5 @@
 import { Checkbox, SvgText, clientColor, toneColor } from "@/components/atoms/svg";
+import { Parcel } from "@/components/atoms/Parcel";
 import type { ChecklistRowView } from "@/lib/types";
 
 /** One activity on a worker's to-do list. */
@@ -17,7 +18,7 @@ export function ChecklistRow({ x, y, width, row, ghost }: { x: number; y: number
           {row.meta}
         </SvgText>
       )}
-      {row.state === "running" && <rect x={x + 22} y={y + 6} width={(row.progress ?? 0) * 120} height={2.5} rx={1} style={{ fill: "var(--c-gold)" }} />}
+      {row.state === "running" && <rect x={x + 22} y={y + 6} width={Math.max(0, row.progress ?? 0) * 120} height={2.5} rx={1} style={{ fill: "var(--c-gold)" }} />}
     </g>
   );
 }
@@ -30,6 +31,8 @@ export function ShelfChip({ x, y, label, client, onClick }: { x: number; y: numb
       tabIndex={0}
       aria-label={`Resume order ${label}`}
       style={{ cursor: "pointer" }}
+      // A mouse click must not leave focus here, or a later Space (play/pause) would hit the node again.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -37,12 +40,14 @@ export function ShelfChip({ x, y, label, client, onClick }: { x: number; y: numb
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
+          e.stopPropagation(); // Space here must not also toggle play
           onClick();
         }
       }}
     >
       <rect x={x} y={y} width={72} height={18} rx={9} strokeWidth={1.5} style={{ fill: "var(--c-panel-2)", stroke: clientColor(client) }} />
-      <SvgText x={x + 36} y={y + 13} size={10.5} textAnchor="middle">
+      <Parcel x={x + 12} y={y + 9} client={client} ring="none" opacity={1} size={10} />
+      <SvgText x={x + 21} y={y + 12.5} size={9.5}>
         {label}
       </SvgText>
     </g>

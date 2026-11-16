@@ -30,6 +30,17 @@
   border-bottom: 1px solid var(--c-line);
   font: var(--fs-sm) / 1.4 var(--font-mono);
 }
+.petName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.petHead {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  overflow: visible;
+}
 .workerRow:last-child {
   border-bottom: 0;
 }
@@ -127,4 +138,51 @@
   min-width: 3.4em;
   color: var(--c-gold);
   font-variant-numeric: tabular-nums;
+}
+
+/* A tool (hammer, pause) as a big icon tile; the active one glows in the step accent. */
+.toolTile {
+  all: unset;
+  cursor: pointer;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  width: 60px;
+  height: 38px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-glass);
+  color: var(--c-dim);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.toolTile:hover {
+  border-color: var(--c-dim);
+}
+.toolTile[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  color: var(--c-ink);
+  box-shadow: 0 0 0 1px var(--c-accent), 0 0 16px color-mix(in srgb, var(--c-accent) 45%, transparent);
+}
+.toolTile:focus-visible {
+  outline: 2px solid var(--c-gold);
+  outline-offset: 2px;
+}
+.toolIcon {
+  display: grid;
+  place-items: center;
+  height: 22px;
+}
+.toolLabel {
+  font: 500 9.5px / 1 var(--font-mono);
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toolTile kbd {
+  position: absolute;
+  top: 4px;
+  right: 6px;
 }
