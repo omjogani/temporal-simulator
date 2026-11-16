@@ -3,23 +3,26 @@
 // produce ArenaViews; the backend sends no extra event fields.
 import type { ArenaView, DotView } from "../types";
 
-export type OrderFx = "orderDone" | "orderLost" | "orderFailed" | "charged" | "duplicate" | "retry";
+export type OrderFx =
+  | "orderDone" | "orderLost" | "orderFailed" | "orderCanceled" | "charged" | "duplicate" | "retry" | "stuck";
 export type FxEvent =
-  | { kind: "workerDown" | "workerUp"; worker: number }
+  | { kind: "workerDown" | "workerUp" | "replayed"; worker: number }
+  | { kind: "timeout"; id: string; client: number; tag: string }
   | { kind: "hubDown" | "hubUp" }
   | { kind: OrderFx; id: string; client: number };
 
-// "canceled" has no effect yet (Task 11).
-const FATE_EVENT: Partial<Record<NonNullable<DotView["fate"]>, OrderFx>> = {
+const FATE_EVENT: Record<NonNullable<DotView["fate"]>, OrderFx> = {
   done: "orderDone",
   lost: "orderLost",
   failed: "orderFailed",
+  canceled: "orderCanceled",
 };
 
 const RING_EVENT: Partial<Record<DotView["ring"], OrderFx>> = {
   charged: "charged",
   dup: "duplicate",
   retry: "retry",
+  stuck: "stuck",
 };
 
 const quiet = (d: DotView) => d.hidden || d.ghost;
@@ -39,6 +42,11 @@ export function diffViews(prev: ArenaView | null, next: ArenaView): FxEvent[] {
     out.push({ kind: w.up ? "workerUp" : "workerDown", worker: w.id });
   }
 
+  const wasReplayed = new Map(prev.workers.map((w) => [w.id, !!w.replayed]));
+  for (const w of next.workers) {
+    if (w.replayed && wasReplayed.get(w.id) === false) out.push({ kind: "replayed", worker: w.id });
+  }
+
   if (prev.hub.up !== next.hub.up) out.push({ kind: next.hub.up ? "hubUp" : "hubDown" });
 
   const old = new Map(prev.dots.map((d) => [d.id, d]));
@@ -49,6 +57,7 @@ export function diffViews(prev: ArenaView | null, next: ArenaView): FxEvent[] {
     if (fateFx && !p.fate) out.push({ kind: fateFx, id: d.id, client: d.client });
     const ring = RING_EVENT[d.ring];
     if (ring && d.ring !== p.ring) out.push({ kind: ring, id: d.id, client: d.client });
+    if (d.tag && !p.tag) out.push({ kind: "timeout", id: d.id, client: d.client, tag: d.tag });
   }
   return out;
 }

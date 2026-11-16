@@ -68,6 +68,15 @@ describe("spawn", () => {
     expect(one({ kind: "retry", id: "a", client: 0 })).toEqual(["spark", "var(--c-gold)"]);
   });
 
+  test("idiom events", () => {
+    const k = (ev: FxEvent) => spawn(ev, at, 0).map((e) => [e.kind, e.color, e.text]);
+    expect(k({ kind: "orderCanceled", id: "a", client: 0 })).toEqual([["poof", "var(--c-dim)", undefined]]);
+    expect(k({ kind: "stuck", id: "a", client: 0 })).toEqual([["shake", "", undefined], ["spark", "var(--c-fault)", undefined]]);
+    expect(k({ kind: "replayed", worker: 1 })).toEqual([["label", "var(--c-gold)", "↻"]]);
+    expect(k({ kind: "timeout", id: "a", client: 0, tag: "heartbeat ⏱" })).toEqual([["label", "var(--c-gold)", "heartbeat ⏱"]]);
+    expect(anchor({ kind: "replayed", worker: 2 }, [])).not.toBeNull();
+  });
+
   test("bornAt, ttl and unique ids", () => {
     const a = spawn({ kind: "hubDown" }, at, 1234);
     const b = spawn({ kind: "hubDown" }, at, 1234);

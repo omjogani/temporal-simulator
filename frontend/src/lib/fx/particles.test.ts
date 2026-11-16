@@ -21,6 +21,14 @@ describe("burst", () => {
     expect(burst(fx("shake"))).toEqual([]);
   });
 
+  test("label is one text particle carrying the effect's text", () => {
+    const e = { ...fx("label"), text: "↻" };
+    const ps = burst(e);
+    expect(ps).toHaveLength(1);
+    expect(ps[0].shape).toBe("text");
+    expect(ps[0].text).toBe("↻");
+  });
+
   test("the hub's impact (power 2) has 32 shards", () => {
     expect(count(burst(fx("impact", 7, 2))).line).toBe(32);
   });
