@@ -118,7 +118,9 @@ func (a *Activities) charge(ctx context.Context, in OrderInput) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	// The workflow ID makes retries safe: Payments charges each order at most once.
-	req.Header.Set("Idempotency-Key", in.OrderID)
+	if !in.NoIdempotencyKey {
+		req.Header.Set("Idempotency-Key", in.OrderID)
+	}
 	resp, err := a.HTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("payments unreachable: %w", err)
