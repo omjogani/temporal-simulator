@@ -161,6 +161,7 @@
   padding: 0 6px 0 calc(6px + 4ch);
   text-indent: -4ch;
   border-left: 3px solid transparent;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
 }
 .code code[data-active="true"] {
   background: color-mix(in srgb, var(--c-gold) 18%, transparent);
