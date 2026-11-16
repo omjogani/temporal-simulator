@@ -41,7 +41,8 @@ export interface SnapOrder {
   /** Unix ms the workflow sleeps until; 0 when it is not sleeping. */
   waitUntil: number;
   express: boolean;
-  timeout: "" | "start-to-close" | "heartbeat" | "schedule-to-close";
+  /** Labels from DescribeWorkflowExecution, or the SDK timeout name the workflow gave up on. */
+  timeout: "" | "start-to-close" | "heartbeat" | "schedule-to-close" | "StartToClose" | "Heartbeat" | "ScheduleToClose";
   stuck: "" | "nondeterminism";
 }
 

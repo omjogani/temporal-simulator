@@ -15,7 +15,15 @@ import type { SnapOrder, SnapStep, Snapshot } from "./snapshot";
 
 const secs = (ms: number) => `${Math.max(0, Math.ceil(ms / 1000))}s`;
 const REPLAY_SHOW_MS = 6000;
-const TIMEOUT_TAG = { "start-to-close": "start-to-close ⏱", heartbeat: "heartbeat ⏱", "schedule-to-close": "schedule-to-close ⏱" } as const;
+const TIMEOUT_TAG = {
+  "start-to-close": "start-to-close ⏱",
+  heartbeat: "heartbeat ⏱",
+  "schedule-to-close": "schedule-to-close ⏱",
+  // The workflow's give-up reason (memo) uses the SDK's names.
+  StartToClose: "start-to-close ⏱",
+  Heartbeat: "heartbeat ⏱",
+  ScheduleToClose: "schedule-to-close ⏱",
+} as const;
 const LANE_LABELS = ["C1 VIP", "C2", "C3", "C4 bulk"];
 
 /** Share of a running activity done, 0..1. Clamped: the browser's estimate of server time can lag `startedAt`. */

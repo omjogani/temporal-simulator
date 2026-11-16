@@ -58,6 +58,9 @@ describe("idiom state", () => {
     expect(d.bow).toBe(true);
     expect(d.tag).toBe("heartbeat ⏱");
   });
+  test("a give-up from the memo uses the same tag", () => {
+    expect(dot({ status: "failed", timeout: "ScheduleToClose" }).tag).toBe("schedule-to-close ⏱");
+  });
   test("replay shows for 6 s only", () => {
     expect(worker0({ replayedAt: NOW - 1000, replayedEvents: 12 }).replayed).toEqual({ events: 12, ago: 1000 });
     expect(worker0({ replayedAt: NOW - 9000, replayedEvents: 12 }).replayed).toBeUndefined();
