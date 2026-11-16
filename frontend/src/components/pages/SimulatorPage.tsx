@@ -6,6 +6,7 @@ import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
 import { BannerLine, Board, ConnectionNotice, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
+import { bubbleVisible, type Bubble } from "@/lib/bubble";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
@@ -18,17 +19,21 @@ import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
 import { useFx } from "@/lib/fx/useFx";
 import { useSound } from "@/lib/fx/sound";
-import type { ActionId, ArenaView, NodeId, SchedMode, ToolId } from "@/lib/types";
+import type { ActionId, ArenaView, NodeId, SchedMode, Tone, ToolId } from "@/lib/types";
 import { useFrameLoop } from "@/lib/useFrameLoop";
 import { SPEED_STOPS, nudgeSpeed, setSpeed, useSpeed } from "@/lib/speed";
 import styles from "./SimulatorPage.module.css";
 
 const BANNER_MS = 7000;
+const PARCEL_TOOLS: ToolId[] = ["select", "error", "signal", "query", "update", "cancel"];
 
 export function SimulatorPage({ config }: { config: StepConfig }) {
   const step = config;
   const router = useRouter();
   const [tool, setTool] = useState<ToolId>(step.tools[0]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [errorMode, setErrorMode] = useState<"500" | "declined">("500");
+  const [bubble, setBubble] = useState<Bubble | null>(null);
   const [frozen, setFrozen] = useState(false);
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
@@ -79,8 +84,33 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
   if (view.banner.seq !== banner.seq && view.banner.text) setBanner({ seq: view.banner.seq, at: now });
   const bannerText = view.banner.text && now - banner.at < BANNER_MS ? view.banner.text : "";
 
+  // Last placed position of each parcel, so a reply can still anchor where a vanished parcel was.
+  const [lastPos] = useState(() => new Map<string, { x: number; y: number }>());
+  useEffect(() => {
+    for (const d of dots) lastPos.set(d.dot.id, { x: d.x, y: d.y });
+  });
+
+  let bubbleAt: { x: number; y: number; text: string; tone: Tone } | null = null;
+  if (bubble && bubbleVisible(bubble, now)) {
+    const p = dots.find((d) => d.dot.id === bubble.orderId) ?? lastPos.get(bubble.orderId);
+    if (p) bubbleAt = { x: p.x, y: p.y, text: bubble.text, tone: bubble.tone };
+  }
+
   const hit = (node: NodeId) => {
     fx.tap(node);
+    if (node.startsWith("o:")) {
+      if (!step.live) return;
+      const id = node.slice(2);
+      if (tool === "select") {
+        setSelected(id);
+        return;
+      }
+      const op = tool === "error" ? "inject" : tool;
+      if (op !== "inject" && op !== "signal" && op !== "query" && op !== "update" && op !== "cancel") return;
+      const at = now;
+      void api.order(id, op, op === "inject" ? errorMode : undefined).then((r) => setBubble({ orderId: id, text: r.text, tone: r.tone, at }));
+      return;
+    }
     if (!step.live) {
       sim?.hit(node, tool);
       return;
@@ -88,6 +118,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     if (node.startsWith("w:")) {
       const id = Number(node.slice(2));
       if (tool === "hammer") void api.hammerWorker(id);
+      else if (tool === "freeze") void api.freeze(id);
       else if (tool === "pause") {
         const o = live.snapshot?.orders.find((x) => x.worker === id && x.status === "running");
         if (o) void api.pause(o.id);
@@ -131,11 +162,30 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       const k = e.key.toLowerCase();
       const has = (a: ActionId) => step.actions.includes(a);
       const nav = neighbours(step);
-      if (e.key === "Escape") router.push("/");
+      const pick = (t: ToolId) => step.tools.includes(t) && (setTool(t), true);
+      if (e.key === "Escape") {
+        if (selected) setSelected(null);
+        else router.push("/");
+      }
       else if (e.key === "ArrowRight" && nav.next) router.push(nav.next);
       else if (e.key === "ArrowLeft" && nav.prev) router.push(nav.prev);
       else if (step.section === "idioms" && /^[1-8]$/.test(e.key) && IDIOMS[Number(e.key) - 1]) router.push(`/idioms/${e.key}`);
-      else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
+      else if (k === "e" && step.tools.includes("error")) {
+        if (tool === "error") setErrorMode((m) => (m === "500" ? "declined" : "500"));
+        else setTool("error");
+      } else if (k === "v" && pick("select")) {
+        /* picked */
+      } else if (k === "g" && pick("signal")) {
+        /* picked */
+      } else if (k === "q" && pick("query")) {
+        /* picked */
+      } else if (k === "u" && pick("update")) {
+        /* picked */
+      } else if (k === "x" && pick("cancel")) {
+        /* picked */
+      } else if (k === "c" && pick("freeze")) {
+        /* picked */
+      } else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
       else if (k === "z" && has("payDown")) action("payDown");
       else if (k === "s" && has("paySlow")) action("paySlow");
       else if (k === "p" && step.tools.includes("pause")) setTool("pause");
@@ -190,12 +240,13 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
           onFreeze={() => setFrozen((f) => !f)}
           muted={sound.muted}
           onSound={sound.toggle}
+          errorMode={tool === "error" || step.tools.includes("error") ? errorMode : undefined}
         />
       }
       left={<WorkersPanel panels={view.panels} />}
       board={
         <ToolCursor tool={tool}>
-          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} />
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }

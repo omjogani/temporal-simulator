@@ -66,6 +66,8 @@ interface ToolboxProps {
   /** Sound effects: muted by default; M toggles. */
   muted: boolean;
   onSound: () => void;
+  /** Sub-mode of the error tool, shown on its tile. */
+  errorMode?: string;
 }
 
 const payActive = (a: ActionId, p: PaymentsView) => (a === "payDown" && p.state === "down") || (a === "paySlow" && p.state === "slow");
@@ -79,11 +81,11 @@ function ToolIcon({ tool }: { tool: ToolId }) {
   return <Icon size={20} />;
 }
 
-export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound }: ToolboxProps) {
+export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, errorMode }: ToolboxProps) {
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
       {step.tools.map((t) => (
-        <ToolButton key={t} label={TOOL_META[t].label} hotkey={TOOL_META[t].key} pressed={tool === t} onClick={() => onTool(t)} icon={<ToolIcon tool={t} />} caption={TOOL_META[t].short} />
+        <ToolButton key={t} label={TOOL_META[t].label} hotkey={TOOL_META[t].key} pressed={tool === t} onClick={() => onTool(t)} icon={<ToolIcon tool={t} />} caption={t === "error" && errorMode ? `${TOOL_META[t].short} ${errorMode}` : TOOL_META[t].short} />
       ))}
       <span className={styles.sep} />
       {step.actions.map((a) =>

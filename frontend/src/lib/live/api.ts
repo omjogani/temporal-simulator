@@ -15,7 +15,49 @@ async function post(path: string, body: unknown = {}) {
   }
 }
 
+export type OpId = "signal" | "query" | "update" | "cancel" | "inject";
+export interface OpReply {
+  ok: boolean;
+  text: string;
+  tone: "good" | "bad" | "gold" | "dim";
+}
+export interface HistEvent {
+  id: number;
+  kind: string;
+  label: string;
+  worker: number;
+  t: number;
+}
+
+const UNREACHABLE: OpReply = { ok: false, text: "Controller unreachable, try again", tone: "gold" };
+
+async function order(id: string, op: OpId, arg = ""): Promise<OpReply> {
+  try {
+    const res = await fetch(CONTROLLER_URL + "/api/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, op, arg }),
+    });
+    return (await res.json()) as OpReply;
+  } catch {
+    return UNREACHABLE;
+  }
+}
+
+async function history(id: string): Promise<HistEvent[]> {
+  try {
+    const res = await fetch(`${CONTROLLER_URL}/api/history?id=${encodeURIComponent(id)}`);
+    return (await res.json()) as HistEvent[];
+  } catch {
+    return [];
+  }
+}
+
 export const api = {
+  order,
+  history,
+  scene: (s: { idemKey?: boolean; build?: string }) => post("/api/scene", s),
+  freeze: (worker: number) => post("/api/freeze", { worker }),
   step: (step: number, force = false) => post("/api/step", { step, force }),
   hammerWorker: (worker: number) => post("/api/hammer", { target: "worker", worker }),
   hammerWorkers: () => post("/api/hammer", { target: "workers" }),

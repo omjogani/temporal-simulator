@@ -12,6 +12,14 @@ interface Props {
   declined?: boolean;
   lost?: boolean;
   label?: string;
+  /** Gift wrap: a signal arrived. */
+  bow?: boolean;
+  /** Small text under the parcel (e.g. "heartbeat"). */
+  tag?: string;
+  /** Canceled: grey and dashed. */
+  canceled?: boolean;
+  /** The presenter's selection: a white outline. */
+  selected?: boolean;
   /** Box width in board units. */
   size?: number;
 }
@@ -28,17 +36,21 @@ function Coins({ x, y, dup }: { x: number; y: number; dup: boolean }) {
 }
 
 /** One order on the board: a parcel in its client's colour, with badges for what happened to it. */
-export function Parcel({ x, y, client, ring, opacity, ghost, declined, lost, label, size = 14 }: Props) {
+export function Parcel({ x, y, client, ring, opacity, ghost, declined, lost, label, bow, tag, canceled, selected, size = 14 }: Props) {
   const w = size;
   const h = size * 0.86;
-  const hollow = ghost || ring === "ghost";
-  const color = lost ? "var(--c-fault)" : clientColor(client);
+  const hollow = ghost || ring === "ghost" || canceled;
+  const color = lost ? "var(--c-fault)" : canceled ? "var(--c-ghost)" : clientColor(client);
   const corner = { x: w / 2, y: -h / 2 };
   return (
     <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} opacity={opacity}>
       {ring === "retry" && (
         <circle r={size * 0.8} fill="none" strokeWidth={2} strokeDasharray="3 3" className={art.spin} style={{ stroke: "var(--c-gold)" }} />
       )}
+      {ring === "stuck" && (
+        <circle r={size * 0.85} fill="none" strokeWidth={2.5} className={art.pulse} style={{ stroke: "var(--c-fault)" }} />
+      )}
+      {selected && <rect x={-w / 2 - 3} y={-h / 2 - 3} width={w + 6} height={h + 6} rx={4} fill="none" strokeWidth={1.8} style={{ stroke: "#ffffff" }} />}
       <rect
         x={-w / 2}
         y={-h / 2}
@@ -69,6 +81,17 @@ export function Parcel({ x, y, client, ring, opacity, ghost, declined, lost, lab
           <circle r={4.5} style={{ fill: "var(--c-fault)" }} />
           <path d="M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8" strokeWidth={1.4} style={{ stroke: "var(--c-bg)" }} />
         </g>
+      )}
+      {bow && (
+        <g>
+          <path d={`M0 ${-h / 2}C-6 ${-h / 2 - 7} -8 ${-h / 2 - 1} 0 ${-h / 2}C8 ${-h / 2 - 1} 6 ${-h / 2 - 7} 0 ${-h / 2}Z`} strokeWidth={1} style={{ fill: "var(--c-gold)", stroke: "rgba(0,0,0,0.5)" }} />
+          <circle cy={-h / 2} r={1.6} style={{ fill: "var(--c-gold)", stroke: "rgba(0,0,0,0.5)" }} strokeWidth={0.8} />
+        </g>
+      )}
+      {tag && (
+        <SvgText x={0} y={h / 2 + 11} size={9.5} tone="gold" textAnchor="middle">
+          {tag}
+        </SvgText>
       )}
       {label && (
         <SvgText x={0} y={-size - 2} size={9.5} tone="gold" textAnchor="middle">

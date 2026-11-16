@@ -110,17 +110,16 @@ export const stepAccent = (id: number): string => (id >= 100 ? "var(--c-idioms)"
 export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
 
 /** Tools are icon tiles; `icon` names an icon in components/atoms/icons.tsx (TOOL_ICONS). */
-export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: "hammer" | "pause" }> = {
+export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: ToolId }> = {
   hammer: { label: "Hammer", short: "Hammer", key: "H", icon: "hammer" },
   pause: { label: "Pause workflow", short: "Pause", key: "P", icon: "pause" },
-  // Placeholder icons until the idioms tools get their own art.
-  select: { label: "Select", short: "Select", key: "V", icon: "pause" },
-  error: { label: "Inject error", short: "Error", key: "E", icon: "hammer" },
-  signal: { label: "Signal", short: "Signal", key: "G", icon: "hammer" },
-  query: { label: "Query", short: "Query", key: "Q", icon: "hammer" },
-  update: { label: "Update", short: "Update", key: "U", icon: "hammer" },
-  cancel: { label: "Cancel", short: "Cancel", key: "X", icon: "hammer" },
-  freeze: { label: "Freeze a pet", short: "Freeze", key: "C", icon: "pause" },
+  select: { label: "Select", short: "Select", key: "V", icon: "select" },
+  error: { label: "Inject error", short: "Error", key: "E", icon: "error" },
+  signal: { label: "Signal", short: "Signal", key: "G", icon: "signal" },
+  query: { label: "Query", short: "Query", key: "Q", icon: "query" },
+  update: { label: "Update", short: "Update", key: "U", icon: "update" },
+  cancel: { label: "Cancel", short: "Cancel", key: "X", icon: "cancel" },
+  freeze: { label: "Freeze a pet", short: "Freeze", key: "C", icon: "freeze" },
 };
 
 export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {

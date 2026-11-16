@@ -16,7 +16,7 @@ export type ActionId =
   | "resumeAll"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
-export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}`;
+export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}` | `o:${string}`;
 export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused" | "canceled";
 
 export type RowState =
