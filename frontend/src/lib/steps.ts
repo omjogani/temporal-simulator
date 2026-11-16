@@ -2,7 +2,7 @@ import type { ActionId, ScoreKey, ToolId } from "./types";
 
 export type SwitchId = "idemKey" | "build";
 export type CodeAnchor = "reserve" | "charge" | "courier" | "ship" | "email" | "cleanup" | "signal" | "update" | "query" | "late";
-/** A short excerpt of workflow.go; anchors are 0-based indexes into `lines`. */
+/** A short excerpt of backend/internal/orders (workflow, activities or worker code); anchors are 0-based indexes into `lines`. */
 export interface CodeSnippet {
   lines: string[];
   anchors: Partial<Record<CodeAnchor, number>>;

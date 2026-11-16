@@ -10,7 +10,7 @@ const base = {
   score: ["done", "inflight", "failed"],
 } as const satisfies Partial<StepConfig>;
 
-/** The eight idiom scenes (live steps 101–108 in the controller). Code excerpts come from backend/internal/orders/workflow.go. */
+/** The eight idiom scenes (live steps 101–108 in the controller). Code excerpts come from backend/internal/orders (workflow.go, activities.go, worker.go). */
 export const IDIOMS: StepConfig[] = [
   {
     ...base,
@@ -96,14 +96,18 @@ export const IDIOMS: StepConfig[] = [
       "Flip the Idempotency key switch, then hammer a pet mid-charge. The activity is retried after the worker dies. Key on: Payments dedups, one coin. Key off: two charges, two red coins.",
     code: {
       lines: [
-        "RetryPolicy: &temporal.RetryPolicy{",
-        "    MaximumAttempts: int32(in.Retry.MaxAttempts),",
-        "    ...",
-        "},",
-        "actx := workflow.WithActivityOptions(ctx, opts)",
-        "err := workflow.ExecuteActivity(actx, name, in).Get(actx, &r)",
+        "req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.ControllerURL+\"/payments/charge\", bytes.NewReader(body))",
+        "...",
+        "// The workflow ID makes retries safe: Payments charges each order at most once.",
+        "if !in.NoIdempotencyKey {",
+        "    req.Header.Set(\"Idempotency-Key\", in.OrderID)",
+        "}",
+        "resp, err := a.HTTP.Do(req)",
+        "if err != nil {",
+        "    return fmt.Errorf(\"payments unreachable: %w\", err)",
+        "}",
       ],
-      anchors: { charge: 5 },
+      anchors: { charge: 4 },
     },
   },
   {
@@ -166,12 +170,17 @@ export const IDIOMS: StepConfig[] = [
       "Watch the pets poll the queue. Hammer all workers and flood orders: with no pollers the backlog grows and nothing is lost. When the pets restart, it drains.",
     code: {
       lines: [
-        "actx := workflow.WithActivityOptions(ctx, opts)",
-        "...",
-        "name := ActivityNames[i]",
-        "err := workflow.ExecuteActivity(actx, name, in).Get(actx, &r)",
+        "w := worker.New(c, TaskQueue, worker.Options{",
+        "    Identity:                           identity,",
+        "    MaxConcurrentActivityExecutionSize: 1,",
+        "    // A killed worker's cached workflows move to the shared queue quickly.",
+        "    StickyScheduleToStartTimeout: 2 * time.Second,",
+        "})",
+        "w.RegisterWorkflowWithOptions(OrderWorkflow, workflow.RegisterOptions{Name: WorkflowName})",
+        "w.RegisterActivity(&Activities{ ... })",
+        "return w.Run(stopCh())",
       ],
-      anchors: { reserve: 3, charge: 3 },
+      anchors: {},
     },
   },
   {
