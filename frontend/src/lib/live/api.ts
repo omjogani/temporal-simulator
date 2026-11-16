@@ -46,12 +46,15 @@ async function order(id: string, op: OpId, arg = ""): Promise<OpReply> {
   }
 }
 
-async function history(id: string): Promise<HistEvent[]> {
+/** The order's history, or null when the controller errors, is unreachable or sends something else. */
+async function history(id: string): Promise<HistEvent[] | null> {
   try {
     const res = await fetch(`${CONTROLLER_URL}/api/history?id=${encodeURIComponent(id)}`);
-    return (await res.json()) as HistEvent[];
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    return Array.isArray(body) ? (body as HistEvent[]) : null;
   } catch {
-    return [];
+    return null;
   }
 }
 

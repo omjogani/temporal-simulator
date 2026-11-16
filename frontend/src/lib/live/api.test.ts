@@ -32,3 +32,20 @@ test("api.freeze posts the worker", async () => {
   await api.freeze(2);
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ worker: 2 });
 });
+
+test("api.history returns null on a non-ok response", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: "x" }) }));
+  expect(await api.history("o7")).toBeNull();
+});
+
+test("api.history returns null for a non-array body and on network failure", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ error: "x" }) }));
+  expect(await api.history("o7")).toBeNull();
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+  expect(await api.history("o7")).toBeNull();
+});
+
+test("api.history returns the events when the body is an array", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => [{ id: 1, kind: "started", label: "", worker: 0, t: 0 }] }));
+  expect(await api.history("o7")).toHaveLength(1);
+});

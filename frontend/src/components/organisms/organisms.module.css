@@ -151,7 +151,7 @@
   margin: 0;
   display: grid;
   overflow-x: auto;
-  font: 500 11px / 1.55 var(--font-mono);
+  font: 500 calc(var(--fs-md) + 2px) / 1.5 var(--font-mono);
   color: var(--c-dim);
 }
 .code code {

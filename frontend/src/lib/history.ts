@@ -38,3 +38,17 @@ const TEXT: Record<string, string> = {
 
 /** Short chip text: the event's own label (activity, signal or update name) when it has one. */
 export const chipText = (e: HistEvent): string => (e.label && e.kind !== "started" ? e.label : (TEXT[e.kind] ?? e.kind));
+
+export interface HistState {
+  id: string | null;
+  events: HistEvent[];
+  /** Newest event id before the latest poll; chips past it slide in (nothing slides on the first load). */
+  base: number;
+}
+
+/** Folds a poll result into the state; a failed poll (null) keeps what is on screen. */
+export function nextHistory(prev: HistState, orderId: string, list: HistEvent[] | null): HistState {
+  if (!list) return prev;
+  const had = prev.id === orderId && prev.events.length > 0;
+  return { id: orderId, events: list, base: had ? prev.events[prev.events.length - 1].id : 0 };
+}
