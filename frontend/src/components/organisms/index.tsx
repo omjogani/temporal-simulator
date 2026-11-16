@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Button, UrlPill } from "@/components/atoms";
+import { Button, Kbd, UrlPill } from "@/components/atoms";
+import { SpeakerIcon, TOOL_ICONS } from "@/components/atoms/icons";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
 import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
 import type { ActionId, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
@@ -61,6 +62,9 @@ interface ToolboxProps {
   onAction: (a: ActionId) => void;
   onSched: (m: SchedMode) => void;
   onFreeze: () => void;
+  /** Sound effects: muted by default; M toggles. */
+  muted: boolean;
+  onSound: () => void;
 }
 
 const payActive = (a: ActionId, p: PaymentsView) => (a === "payDown" && p.state === "down") || (a === "paySlow" && p.state === "slow");
@@ -69,11 +73,16 @@ const payActive = (a: ActionId, p: PaymentsView) => (a === "payDown" && p.state 
 const actionLabel = (a: ActionId, p: PaymentsView) =>
   payActive(a, p) ? `${ACTION_META[a].label} · ${Math.ceil(p.leftMs / 1000)}s` : ACTION_META[a].label;
 
-export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze }: ToolboxProps) {
+function ToolIcon({ tool }: { tool: ToolId }) {
+  const Icon = TOOL_ICONS[TOOL_META[tool].icon];
+  return <Icon size={20} />;
+}
+
+export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound }: ToolboxProps) {
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
       {step.tools.map((t) => (
-        <ToolButton key={t} label={TOOL_META[t].label} hotkey={TOOL_META[t].key} pressed={tool === t} onClick={() => onTool(t)} />
+        <ToolButton key={t} label={TOOL_META[t].label} hotkey={TOOL_META[t].key} pressed={tool === t} onClick={() => onTool(t)} icon={<ToolIcon tool={t} />} caption={TOOL_META[t].short} />
       ))}
       <span className={styles.sep} />
       {step.actions.map((a) =>
@@ -99,6 +108,10 @@ export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction,
         </Button>
       )}
       <ToolButton label="Reset" hotkey="R" onClick={() => onAction("reset")} />
+      <Button pressed={!muted} onClick={onSound} aria-label={muted ? "Sound off" : "Sound on"} title="Sound effects (M)">
+        <SpeakerIcon size={15} muted={muted} />
+        <Kbd>M</Kbd>
+      </Button>
     </div>
   );
 }

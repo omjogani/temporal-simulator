@@ -7,6 +7,12 @@
 .svg [role="button"]:focus-visible {
   outline: none;
 }
-.svg [role="button"]:focus-visible > rect:first-child {
+.svg [role="button"]:focus-visible > rect:first-child,
+.svg [role="button"]:focus-visible > g:first-child > rect:first-child {
   stroke: var(--c-gold) !important;
+}
+
+/* Board nodes: no box after a mouse click; keyboard focus keeps the gold ring (globals.css). */
+.svg [role="button"]:focus:not(:focus-visible) {
+  outline: none;
 }

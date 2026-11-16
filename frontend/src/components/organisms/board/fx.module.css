@@ -1,0 +1,48 @@
+/* The board wrapper: the tool icon replaces the mouse pointer here. */
+.cursorArea {
+  position: relative;
+}
+@media (pointer: fine) {
+  .cursorArea,
+  .cursorArea * {
+    cursor: none !important;
+  }
+}
+
+.cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+}
+.cursor[data-show="false"] {
+  display: none;
+}
+.cursorInner {
+  width: 40px;
+  height: 40px;
+}
+/* Wind up, strike, settle. Pivot is set inline (the hammer's handle end). */
+.swing {
+  animation: swing 180ms ease-out;
+}
+@keyframes swing {
+  0% { transform: rotate(0); }
+  35% { transform: rotate(22deg); }
+  70% { transform: rotate(-38deg); }
+  100% { transform: rotate(0); }
+}
+
+/* The PixiJS effects canvas over the board. */
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.canvas canvas {
+  display: block;
+}

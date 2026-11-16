@@ -13,6 +13,7 @@ The talk has two acts, one URL per step:
 
 | Route | Act | Topic | Backed by |
 |---|---|---|---|
+| `/` | | Scenario menu: one cartridge per step | |
 | `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost | In-browser illustration |
 | `/2` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
@@ -41,6 +42,8 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
   src/components/atoms|molecules|organisms|templates
   src/app/[step]/         one route per step
   src/lib/                step configs, board geometry, Act 1 simulation, live adapter
+  src/lib/fx/             effects from diffing ArenaViews (events, effects, particles), sound
+  src/lib/pets.ts         the four worker pets and their poses
 ```
 
 ## How the live steps work
@@ -85,7 +88,7 @@ Only ever hammer / kill the `temporal-sim` and `worker-*` containers from this c
 ```bash
 make up          # Temporal in Docker (:17233, UI :18233)
 make dev         # controller (:18080, spawns 4 workers) + Next.js (:13000)
-open http://localhost:13000/1
+open http://localhost:13000/
 ```
 
 Or by hand:
@@ -100,7 +103,7 @@ Checks before committing:
 
 ```bash
 cd backend && go vet ./... && go build ./...
-cd frontend && pnpm lint && pnpm build
+cd frontend && pnpm test && pnpm lint && pnpm build
 ```
 
 ## Conventions
@@ -114,6 +117,11 @@ cd frontend && pnpm lint && pnpm build
   board and panel sections (WorkerCard, Board, Toolbox, StepRail). Templates lay out a page
   (ArenaTemplate). Pages in `src/app` only wire data into a template.
   CSS Modules plus design tokens in `src/styles/tokens.css`. No new UI libraries without a reason.
+  Board art is inline SVG atoms animated with CSS (pets, parcels, belts, kiosks). Particles
+  (impacts, confetti, coins, sparks, dust) are drawn by one PixiJS canvas over the board
+  (`FxCanvas`). Effects come from diffing consecutive `ArenaView`s (`src/lib/fx/events.ts`),
+  never from extra backend fields. Keys: ← → steps, `Esc` menu, `H` `P` tools, `F` `A` `Z` `S`
+  `D` actions, `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
 - **Presentation-first UI:** the screen is projected during a talk. Keep side panels minimal,
   numbers large, colours meaningful (gold = charged / retrying, red = lost / duplicate,
   green = done). Don't add dense debug info to the main view.

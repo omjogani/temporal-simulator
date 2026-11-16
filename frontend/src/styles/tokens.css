@@ -30,6 +30,19 @@
   --c-client-3: #5ea2f0;
   --c-client-4: #d6a531;
 
+  /* step accents (one per route; tints the title, the active tool and the cartridge) */
+  --c-step-1: #e5645c;
+  --c-step-2: #45c9a8;
+  --c-step-3: #e9c04f;
+  --c-step-4: #5ea2f0;
+  --c-step-5: #a07cf0;
+  --c-accent: var(--c-ok); /* set per step on the arena */
+
+  /* glass panels over the illustrated stage */
+  --c-glass: rgba(26, 30, 36, 0.72);
+  --c-glass-line: rgba(232, 235, 228, 0.14);
+  --blur-glass: 10px;
+
   /* type */
   --font-display: var(--font-big-shoulders), "Arial Narrow", Impact, sans-serif;
   --font-body: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;

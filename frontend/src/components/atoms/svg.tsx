@@ -1,6 +1,7 @@
 // SVG atoms for the board. Colours come from design tokens via inline style.
 import type { ReactNode, SVGProps } from "react";
-import type { Ring, RowState, Tone } from "@/lib/types";
+import type { RowState, Tone } from "@/lib/types";
+import art from "./art.module.css";
 import { smooth, type Pt } from "@/lib/geometry";
 
 export const toneColor: Record<Tone, string> = {
@@ -29,57 +30,83 @@ export function SvgText({ tone = "neutral", color, size = 12, weight = 400, styl
   );
 }
 
-/** Box with optional fault styling: the frame of every board node. */
-export function NodeFrame({ x, y, w, h, down, highlight, stroke }: { x: number; y: number; w: number; h: number; down?: boolean; highlight?: boolean; stroke?: string }) {
+/** Glass box with a roof bar in the step accent: the frame of every board node. */
+export function NodeFrame({ x, y, w, h, down, highlight, stroke, roof = "straight" }: { x: number; y: number; w: number; h: number; down?: boolean; highlight?: boolean; stroke?: string; roof?: "straight" | "crooked" }) {
+  const left = x - w / 2;
+  const top = y - h / 2;
   return (
-    <rect
-      x={x - w / 2}
-      y={y - h / 2}
-      width={w}
-      height={h}
-      rx={8}
-      strokeWidth={2}
-      style={{
-        fill: down ? "var(--c-fault-bg)" : "var(--c-panel)",
-        stroke: down ? "var(--c-fault)" : highlight ? "var(--c-gold)" : (stroke ?? "var(--c-line)"),
-        transition: "stroke .15s",
-      }}
-    />
+    <>
+      <rect
+        x={left}
+        y={top}
+        width={w}
+        height={h}
+        rx={8}
+        strokeWidth={1.5}
+        style={{
+          fill: down ? "var(--c-fault-bg)" : "var(--c-glass)",
+          stroke: down ? "var(--c-fault)" : highlight ? "var(--c-gold)" : (stroke ?? "var(--c-glass-line)"),
+          transition: "stroke .15s",
+        }}
+      />
+      <rect
+        x={left + 10}
+        y={top - 1.5}
+        width={w - 20}
+        height={3}
+        rx={1.5}
+        transform={roof === "crooked" ? `rotate(1.5 ${x} ${top})` : undefined}
+        style={{ fill: down ? "var(--c-fault)" : "var(--c-accent)" }}
+      />
+    </>
   );
 }
 
-export function Wire({ pts }: { pts: Pt[] }) {
+/** A client's shop front: striped awning in its colour over a dark counter, centred on (x, y). */
+export function Kiosk({ x, y, w, color, label }: { x: number; y: number; w: number; color: string; label: string }) {
+  const h = 36;
+  const left = x - w / 2;
+  const top = y - h / 2;
+  const awnTop = top - 4;
+  const awnBottom = top + 9;
+  const n = Math.round(w / 14); // scallops
+  const s = w / n;
+  let scallops = "";
+  for (let k = n; k > 0; k--) {
+    const x1 = left + k * s;
+    const x0 = x1 - s;
+    scallops += ` Q${(x0 + x1) / 2} ${awnBottom + 6} ${x0} ${awnBottom}`;
+  }
+  const awning = `M${left} ${awnTop} H${left + w} V${awnBottom}${scallops} Z`;
+  const clip = `awn-${Math.round(x)}-${Math.round(y)}`;
+  return (
+    <g>
+      <rect x={left} y={top} width={w} height={h} rx={6} strokeWidth={1.5} style={{ fill: "var(--c-panel)", stroke: color }} />
+      <clipPath id={clip}>
+        <path d={awning} />
+      </clipPath>
+      <path d={awning} style={{ fill: color }} />
+      <g clipPath={`url(#${clip})`}>
+        {Array.from({ length: n }, (_, k) => (
+          <rect key={k} x={left + k * s + s / 2} y={awnTop} width={s / 2} height={awnBottom - awnTop + 8} fill="#ffffff" opacity={0.28} />
+        ))}
+      </g>
+      <SvgText x={x} y={top + 28} textAnchor="middle" size={11} color={color}>
+        {label}
+      </SvgText>
+    </g>
+  );
+}
+
+/** A conveyor belt along a wire path; the centre dashes run while `moving`. */
+export function Wire({ pts, moving = true }: { pts: Pt[]; moving?: boolean }) {
   const d = smooth(pts)
     .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
     .join("");
   return (
-    <path d={d} fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: "var(--c-wire)" }} opacity={0.75} />
-  );
-}
-
-const ringColor: Record<Ring, string | null> = {
-  none: null,
-  charged: "var(--c-gold)",
-  dup: "var(--c-fault)",
-  ghost: "var(--c-dim)",
-  done: "var(--c-ok)",
-  failed: "var(--c-gold)",
-  retry: "var(--c-gold)",
-};
-
-/** One order on the board. */
-export function OrderDot({ x, y, client, ring, opacity, ghost, declined, lost, label }: { x: number; y: number; client: number; ring: Ring; opacity: number; ghost?: boolean; declined?: boolean; lost?: boolean; label?: string }) {
-  const rc = ringColor[ring];
-  const fill = lost ? "var(--c-fault)" : ghost ? "var(--c-ghost)" : declined ? "var(--c-violet)" : clientColor(client);
-  return (
-    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} opacity={opacity}>
-      {rc && <circle r={11} fill="none" strokeWidth={2.5} strokeDasharray={ring === "ghost" || ring === "retry" ? "3 3" : undefined} style={{ stroke: rc }} />}
-      <circle r={7} style={{ fill, stroke: declined ? "var(--c-ink)" : "none" }} strokeWidth={1.5} />
-      {label && (
-        <SvgText x={0} y={-15} size={9.5} tone="gold" textAnchor="middle">
-          {label}
-        </SvgText>
-      )}
+    <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} strokeWidth={9} style={{ stroke: "var(--c-panel-2)" }} />
+      <path d={d} strokeWidth={1.5} strokeDasharray="6 10" className={moving ? art.belt : undefined} style={{ stroke: "var(--c-wire)" }} />
     </g>
   );
 }

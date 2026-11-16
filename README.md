@@ -22,7 +22,9 @@ make up     # Temporal + 4 worker containers in Docker: gRPC :17233, Web UI http
 make dev    # Go controller on :18080 (drives the workers) + Next.js on :13000
 ```
 
-Open <http://localhost:13000/1>. Use ← → to move between steps.
+Open <http://localhost:13000/> and pick a scenario cartridge (← → to choose, Enter to start,
+`1`–`5` to jump straight in). Inside a step, ← → move between steps and `Esc` returns to the menu.
+`M` turns the sound effects on or off (off by default).
 
 Every step loads paused: press **▶ Play** (or Space) to start the clients placing orders, and
 again to pause them (orders in flight finish). The **Speed** slider (or `-` / `+`) changes how fast orders move, from 0.25× to 2×: dot travel,

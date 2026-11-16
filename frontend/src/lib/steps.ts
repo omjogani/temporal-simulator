@@ -87,11 +87,15 @@ export const STEPS: StepConfig[] = [
   },
 ];
 
-export const getStep = (id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
+/** The step's accent colour as a CSS value. */
+export const stepAccent = (id: number): string => `var(--c-step-${id})`;
 
-export const TOOL_META: Record<ToolId, { label: string; key: string }> = {
-  hammer: { label: "🔨 Hammer", key: "H" },
-  pause: { label: "⏸ Pause workflow", key: "P" },
+export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
+
+/** Tools are icon tiles; `icon` names an icon in components/atoms/icons.tsx (TOOL_ICONS). */
+export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: ToolId }> = {
+  hammer: { label: "Hammer", short: "Hammer", key: "H", icon: "hammer" },
+  pause: { label: "Pause workflow", short: "Pause", key: "P", icon: "pause" },
 };
 
 export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {

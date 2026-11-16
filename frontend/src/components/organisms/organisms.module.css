@@ -1,6 +1,8 @@
 .panel {
-  background: var(--c-panel);
-  border: 1px solid var(--c-line);
+  background: var(--c-glass);
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+  border: 1px solid var(--c-glass-line);
   border-radius: var(--radius-md);
   padding: 14px;
 }
@@ -74,8 +76,10 @@
 }
 
 .caption {
-  background: var(--c-panel);
-  border: 1px solid var(--c-line);
+  background: var(--c-glass);
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  backdrop-filter: blur(var(--blur-glass));
+  border: 1px solid var(--c-glass-line);
   border-radius: var(--radius-md);
   padding: 11px 14px;
   font-size: var(--fs-md);

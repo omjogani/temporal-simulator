@@ -11,7 +11,12 @@ import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
-import { STEPS, getStep } from "@/lib/steps";
+import { STEPS, getStep, stepAccent } from "@/lib/steps";
+import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
+import { FxCanvas } from "@/components/organisms/board/FxCanvas";
+import { ToolCursor } from "@/components/organisms/board/ToolCursor";
+import { useFx } from "@/lib/fx/useFx";
+import { useSound } from "@/lib/fx/sound";
 import type { ActionId, ArenaView, NodeId, SchedMode, ToolId } from "@/lib/types";
 import { useFrameLoop } from "@/lib/useFrameLoop";
 import { SPEED_STOPS, nudgeSpeed, setSpeed, useSpeed } from "@/lib/speed";
@@ -45,6 +50,8 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     if (sim && !frozen) sim.tick(dt, speed);
   });
   const place = useDotMotion();
+  const fxUpdate = useFx();
+  const [resetCount, setResetCount] = useState(0);
 
   let view: ArenaView;
   if (!step.live) view = sim ? sim.view() : emptyLiveView(step, true);
@@ -54,12 +61,25 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   } else view = emptyLiveView(step, live.connected);
 
   const dots = place(view.dots, now, speed);
+  // Act 1 swaps the sim object on Reset; live steps count resets.
+  // Effects start fresh (nothing fires for state already on screen) after Reset, when
+  // Act 1 swaps its sim, and when live data first arrives or comes back after a drop.
+  const liveReal = Boolean(live.connected && live.snapshot && live.snapshot.step === step.id);
+  const fxResetKey = step.live ? `${resetCount}:${liveReal}` : sim;
+  const fx = fxUpdate(view, dots, now, fxResetKey);
+
+  // Sound (muted by default): play what happened, after the frame is committed.
+  const sound = useSound();
+  useEffect(() => {
+    sound.play(fx.takeEvents(), now);
+  });
 
   // Show each banner for a few seconds.
   if (view.banner.seq !== banner.seq && view.banner.text) setBanner({ seq: view.banner.seq, at: now });
   const bannerText = view.banner.text && now - banner.at < BANNER_MS ? view.banner.text : "";
 
   const hit = (node: NodeId) => {
+    fx.tap(node);
     if (!step.live) {
       sim?.hit(node, tool);
       return;
@@ -76,6 +96,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
 
   const action = (a: ActionId) => {
     if (a === "reset") {
+      setResetCount((n) => n + 1);
       if (step.live) void api.step(step.id, true);
       else setSim(newSim());
       return;
@@ -108,7 +129,8 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       if (e.target instanceof HTMLInputElement) return; // e.g. arrow keys on the speed slider
       const k = e.key.toLowerCase();
       const has = (a: ActionId) => step.actions.includes(a);
-      if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
+      if (e.key === "Escape") router.push("/");
+      else if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
       else if (e.key === "ArrowLeft" && step.id > 1) router.push(`/${step.id - 1}`);
       else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
       else if (k === "z" && has("payDown")) action("payDown");
@@ -120,6 +142,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
       else if (k === "r") action("reset");
+      else if (k === "m") sound.toggle();
       else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
       else if (e.key === "=" || e.key === "+") nudgeSpeed(1);
       else if (e.key === " ") {
@@ -133,6 +156,8 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
 
   return (
     <ArenaTemplate
+      accent={stepAccent(step.id)}
+      backdrop={<SceneBackdrop variant={step.act === 1 ? "shed" : "depot"} />}
       url={<StepNav current={step.id} />}
       title={step.name}
       tag={<Tag tone={step.act === 1 ? "bad" : "good"}>{step.act === 1 ? "Without Temporal" : "Real Temporal"}</Tag>}
@@ -160,10 +185,17 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           onAction={action}
           onSched={setSched}
           onFreeze={() => setFrozen((f) => !f)}
+          muted={sound.muted}
+          onSound={sound.toggle}
         />
       }
       left={<WorkersPanel panels={view.panels} />}
-      board={<Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} />}
+      board={
+        <ToolCursor tool={tool}>
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} />
+          <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
+        </ToolCursor>
+      }
       overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
       right={<OrdersPanel panels={view.panels} />}
       caption={<TryThis text={step.tryThis} />}

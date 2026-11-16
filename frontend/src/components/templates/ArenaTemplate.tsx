@@ -1,7 +1,11 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import styles from "./ArenaTemplate.module.css";
 
 interface Props {
+  /** Step accent colour (a CSS colour or var()). */
+  accent: string;
+  /** Illustrated stage drawn behind the panels and the board. */
+  backdrop: ReactNode;
   url: ReactNode;
   title: string;
   tag: ReactNode;
@@ -17,9 +21,9 @@ interface Props {
 }
 
 /** Page layout of the simulator: top bar, panel | board | panel, caption, step rail. */
-export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner }: Props) {
+export function ArenaTemplate({ accent, backdrop, url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner }: Props) {
   return (
-    <main className={styles.arena}>
+    <main className={styles.arena} style={{ "--c-accent": accent } as CSSProperties}>
       <header className={styles.top}>
         {url}
         <h1 className={styles.title}>{title}</h1>
@@ -31,6 +35,9 @@ export function ArenaTemplate({ url, title, tag, extra, speed, toolbox, left, bo
         </div>
       </header>
       <div className={styles.grid}>
+        <div className={styles.backdrop} aria-hidden>
+          {backdrop}
+        </div>
         <div className={styles.left}>{left}</div>
         <div className={styles.board}>
           {board}

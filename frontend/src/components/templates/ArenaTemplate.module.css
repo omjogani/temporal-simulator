@@ -16,6 +16,8 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 3px solid var(--c-accent);
 }
 .tools {
   margin-left: auto;
@@ -25,16 +27,34 @@
   align-items: center;
 }
 .grid {
+  position: relative;
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr) 210px;
   gap: 12px;
   align-items: start;
+  padding: 12px; /* the stage shows around the panels */
 }
+/* The illustrated stage behind everything in the grid. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--c-glass-line);
+}
+.backdrop > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.left,
+.right,
 .board {
   position: relative;
-  background: var(--c-board);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-lg);
+  z-index: 1;
+}
+.board {
   overflow: hidden;
   min-width: 0;
 }
