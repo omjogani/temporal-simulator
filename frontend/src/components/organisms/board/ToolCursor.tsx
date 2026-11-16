@@ -2,6 +2,7 @@
 
 import { useRef, type ReactNode } from "react";
 import { TOOL_ICONS } from "@/components/atoms/icons";
+import { TOOL_META } from "@/lib/steps";
 import type { ToolId } from "@/lib/types";
 import styles from "./fx.module.css";
 
@@ -19,8 +20,9 @@ const PIVOT = { hammer: "34px 34px", pause: "20px 36px" } as const;
 export function ToolCursor({ tool, children }: { tool: ToolId; children: ReactNode }) {
   const icon = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  const Icon = TOOL_ICONS[tool];
-  const hot = HOT[tool];
+  const icon_ = TOOL_META[tool].icon;
+  const Icon = TOOL_ICONS[icon_];
+  const hot = HOT[icon_];
 
   const move = (e: React.PointerEvent) => {
     if (e.pointerType !== "mouse" || !icon.current || !wrap.current) return;
@@ -48,7 +50,7 @@ export function ToolCursor({ tool, children }: { tool: ToolId; children: ReactNo
     <div ref={wrap} className={styles.cursorArea} onPointerMove={move} onPointerLeave={hide} onPointerDown={swing}>
       {children}
       <div ref={icon} className={styles.cursor} data-show="false" aria-hidden>
-        <div className={styles.cursorInner} style={{ transformOrigin: PIVOT[tool] }}>
+        <div className={styles.cursorInner} style={{ transformOrigin: PIVOT[icon_] }}>
           <Icon size={ICON} />
         </div>
       </div>

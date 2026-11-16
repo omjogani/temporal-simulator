@@ -3,7 +3,7 @@
 
 export type Tone = "neutral" | "good" | "bad" | "gold" | "dim";
 
-export type ToolId = "hammer" | "pause";
+export type ToolId = "hammer" | "pause" | "select" | "error" | "signal" | "query" | "update" | "cancel" | "freeze";
 export type ActionId =
   | "flood"
   | "bulk"
@@ -11,6 +11,7 @@ export type ActionId =
   | "declined"
   | "payDown"
   | "paySlow"
+  | "payDownLong"
   | "pauseAll"
   | "resumeAll"
   | "reset";

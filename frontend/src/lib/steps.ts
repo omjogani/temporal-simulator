@@ -1,6 +1,18 @@
 import type { ActionId, ScoreKey, ToolId } from "./types";
 
+export type SwitchId = "idemKey" | "build";
+export type CodeAnchor = "reserve" | "charge" | "courier" | "ship" | "email" | "cleanup" | "signal" | "update" | "query" | "late";
+/** A short excerpt of workflow.go; anchors are 0-based indexes into `lines`. */
+export interface CodeSnippet {
+  lines: string[];
+  anchors: Partial<Record<CodeAnchor, number>>;
+}
+
 export interface StepConfig {
+  section: "steps" | "idioms";
+  rule?: string;
+  code?: CodeSnippet;
+  switches?: SwitchId[];
   id: number;
   act: 1 | 2;
   name: string;
@@ -16,6 +28,7 @@ export interface StepConfig {
 
 export const STEPS: StepConfig[] = [
   {
+    section: "steps",
     id: 1,
     act: 1,
     name: "Plain queue",
@@ -30,6 +43,7 @@ export const STEPS: StepConfig[] = [
       "Hammer a busy worker. The queue deleted that order when it handed it out, so it dies halfway: stock reserved, card charged, never shipped. Then hammer the queue: every waiting order is gone, and new orders fail for 10 s.",
   },
   {
+    section: "steps",
     id: 2,
     act: 2,
     name: "Durability",
@@ -44,6 +58,7 @@ export const STEPS: StepConfig[] = [
       "Hammer a worker mid-order: its ticks are kept and Temporal retries the step on a healthy worker. Hammer all workers, or hammer the Temporal Service itself, for 10 s. Everything waits, then continues. Lost stays at 0.",
   },
   {
+    section: "steps",
     id: 3,
     act: 2,
     name: "Timeouts & retries",
@@ -58,6 +73,7 @@ export const STEPS: StepConfig[] = [
       "Take Payments down for 10 s: Charge card retries after 1, 2, 4 and 8 s, with the retry timer held by Temporal, then succeeds once Payments is back. Make Payments slow: calls take 5 s, hit the 3 s timeout and retry. Send a declined card: it's non-retryable, so the order fails fast and releases its stock.",
   },
   {
+    section: "steps",
     id: 4,
     act: 2,
     name: "Priority & fairness",
@@ -72,6 +88,7 @@ export const STEPS: StepConfig[] = [
       "Pick a mode first, then send a bulk import from Client 4. FIFO: everyone waits behind it. Priority: Client 1 (VIP) jumps ahead. Fairness: every client gets its turn. Modes apply to orders placed after you switch.",
   },
   {
+    section: "steps",
     id: 5,
     act: 2,
     name: "Pause & resume",
@@ -88,14 +105,22 @@ export const STEPS: StepConfig[] = [
 ];
 
 /** The step's accent colour as a CSS value. */
-export const stepAccent = (id: number): string => `var(--c-step-${id})`;
+export const stepAccent = (id: number): string => (id >= 100 ? "var(--c-idioms)" : `var(--c-step-${id})`);
 
 export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
 
 /** Tools are icon tiles; `icon` names an icon in components/atoms/icons.tsx (TOOL_ICONS). */
-export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: ToolId }> = {
+export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: "hammer" | "pause" }> = {
   hammer: { label: "Hammer", short: "Hammer", key: "H", icon: "hammer" },
   pause: { label: "Pause workflow", short: "Pause", key: "P", icon: "pause" },
+  // Placeholder icons until the idioms tools get their own art.
+  select: { label: "Select", short: "Select", key: "V", icon: "pause" },
+  error: { label: "Inject error", short: "Error", key: "E", icon: "hammer" },
+  signal: { label: "Signal", short: "Signal", key: "G", icon: "hammer" },
+  query: { label: "Query", short: "Query", key: "Q", icon: "hammer" },
+  update: { label: "Update", short: "Update", key: "U", icon: "hammer" },
+  cancel: { label: "Cancel", short: "Cancel", key: "X", icon: "hammer" },
+  freeze: { label: "Freeze a pet", short: "Freeze", key: "C", icon: "pause" },
 };
 
 export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
@@ -105,6 +130,7 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   declined: { label: "Declined card", key: "D" },
   payDown: { label: "⚡ Payments down", key: "Z" },
   paySlow: { label: "🐌 Payments slow", key: "S" },
+  payDownLong: { label: "⚡ Payments down 20 s", key: "L" },
   pauseAll: { label: "Pause all" },
   resumeAll: { label: "Resume all" },
   reset: { label: "Reset", key: "R" },

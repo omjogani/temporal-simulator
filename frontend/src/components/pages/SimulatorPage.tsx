@@ -11,7 +11,8 @@ import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
-import { STEPS, getStep, stepAccent } from "@/lib/steps";
+import { IDIOMS, neighbours } from "@/lib/idioms";
+import { stepAccent, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
@@ -24,8 +25,8 @@ import styles from "./SimulatorPage.module.css";
 
 const BANNER_MS = 7000;
 
-export function SimulatorPage({ stepId }: { stepId: number }) {
-  const step = getStep(stepId) ?? STEPS[0];
+export function SimulatorPage({ config }: { config: StepConfig }) {
+  const step = config;
   const router = useRouter();
   const [tool, setTool] = useState<ToolId>(step.tools[0]);
   const [frozen, setFrozen] = useState(false);
@@ -129,9 +130,11 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       if (e.target instanceof HTMLInputElement) return; // e.g. arrow keys on the speed slider
       const k = e.key.toLowerCase();
       const has = (a: ActionId) => step.actions.includes(a);
+      const nav = neighbours(step);
       if (e.key === "Escape") router.push("/");
-      else if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
-      else if (e.key === "ArrowLeft" && step.id > 1) router.push(`/${step.id - 1}`);
+      else if (e.key === "ArrowRight" && nav.next) router.push(nav.next);
+      else if (e.key === "ArrowLeft" && nav.prev) router.push(nav.prev);
+      else if (step.section === "idioms" && /^[1-8]$/.test(e.key) && IDIOMS[Number(e.key) - 1]) router.push(`/idioms/${e.key}`);
       else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
       else if (k === "z" && has("payDown")) action("payDown");
       else if (k === "s" && has("paySlow")) action("paySlow");
@@ -158,7 +161,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     <ArenaTemplate
       accent={stepAccent(step.id)}
       backdrop={<SceneBackdrop variant={step.act === 1 ? "shed" : "depot"} />}
-      url={<StepNav current={step.id} />}
+      url={<StepNav config={step} />}
       title={step.name}
       tag={<Tag tone={step.act === 1 ? "bad" : "good"}>{step.act === 1 ? "Without Temporal" : "Real Temporal"}</Tag>}
       extra={
