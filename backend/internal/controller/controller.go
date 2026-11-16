@@ -86,6 +86,7 @@ func New(cfg Config) (*Controller, error) {
 		speed:     1,
 		idemKey:   true,
 		build:     "good",
+		queue:     QueueView{Pollers: []int{}},
 	}
 	for i := 1; i <= numWorkers; i++ {
 		c.workers[i] = &workerProc{id: i}

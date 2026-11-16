@@ -20,7 +20,7 @@ type QueueView struct {
 	Backlog int64 `json:"backlog"`
 }
 
-const pollerFresh = 5 * time.Second
+const pollerFresh = 70 * time.Second
 
 // timeoutLabel names the timeout that failed an activity attempt.
 func timeoutLabel(t enumspb.TimeoutType) string {
@@ -59,9 +59,10 @@ func stuckFromEvents(events []*historypb.HistoryEvent) string {
 	return ""
 }
 
-// queueFromInfo folds a DescribeTaskQueueEnhanced answer into a QueueView.
-func queueFromInfo(desc client.TaskQueueDescription, now time.Time) QueueView {
-	seen := map[int]bool{}
+// listedPollers folds a DescribeTaskQueueEnhanced answer into the newest LastAccessTime
+// per worker id, plus the summed backlog.
+func listedPollers(desc client.TaskQueueDescription) (map[int]time.Time, int64) {
+	listed := map[int]time.Time{}
 	var backlog int64
 	for _, vi := range desc.VersionsInfo {
 		for _, ti := range vi.TypesInfo {
@@ -69,21 +70,28 @@ func queueFromInfo(desc client.TaskQueueDescription, now time.Time) QueueView {
 				backlog += ti.Stats.ApproximateBacklogCount
 			}
 			for _, p := range ti.Pollers {
-				if now.Sub(p.LastAccessTime) >= pollerFresh {
-					continue
-				}
-				if id := workerIDFromIdentity(p.Identity); id > 0 {
-					seen[id] = true
+				if id := workerIDFromIdentity(p.Identity); id > 0 && p.LastAccessTime.After(listed[id]) {
+					listed[id] = p.LastAccessTime
 				}
 			}
 		}
 	}
-	q := QueueView{Pollers: []int{}, Backlog: backlog}
-	for id := range seen {
-		q.Pollers = append(q.Pollers, id)
+	return listed, backlog
+}
+
+// visiblePollers returns the worker ids to show as polling: Temporal lists the worker with a
+// LastAccessTime under pollerFresh (above the ~60 s long-poll timeout, since an idle poller's
+// time is when its current long poll began), and the controller sees it up and not frozen.
+func visiblePollers(listed map[int]time.Time, now time.Time, up, frozen [numWorkers + 1]bool) []int {
+	out := []int{}
+	for id, at := range listed {
+		if id < 1 || id > numWorkers || !up[id] || frozen[id] || now.Sub(at) >= pollerFresh {
+			continue
+		}
+		out = append(out, id)
 	}
-	sort.Ints(q.Pollers)
-	return q
+	sort.Ints(out)
+	return out
 }
 
 // describeLoop reads, for each open order in the timeout and deploy scenes, what
@@ -111,9 +119,14 @@ func (c *Controller) describeLoop(ctx context.Context) {
 		if len(ids) > 40 {
 			ids = ids[:40]
 		}
+		tick, cancel := context.WithTimeout(ctx, 1500*time.Millisecond) // a mid-tick Temporal death cannot stall the loop
 		for _, id := range ids {
-			c.describeOne(ctx, id)
+			if tick.Err() != nil {
+				break
+			}
+			c.describeOne(tick, id)
 		}
+		cancel()
 	}
 }
 
@@ -164,11 +177,13 @@ func (c *Controller) queueLoop(ctx context.Context) {
 		case <-t.C:
 		}
 		c.mu.Lock()
-		live, up := c.step.Live, c.temporalUp
-		c.mu.Unlock()
-		if !live || !up {
+		live, tUp := c.step.Live, c.temporalUp
+		if !live || !tUp {
+			c.queue = QueueView{Pollers: []int{}} // no stale pollers on a dead server
+			c.mu.Unlock()
 			continue
 		}
+		c.mu.Unlock()
 		qctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		desc, err := c.tc.DescribeTaskQueueEnhanced(qctx, client.DescribeTaskQueueEnhancedOptions{
 			TaskQueue:     orders.TaskQueue,
@@ -179,9 +194,13 @@ func (c *Controller) queueLoop(ctx context.Context) {
 		if err != nil {
 			continue
 		}
-		q := queueFromInfo(desc, time.Now())
+		listed, backlog := listedPollers(desc)
 		c.mu.Lock()
-		c.queue = q
+		var up, frozen [numWorkers + 1]bool
+		for i := 1; i <= numWorkers; i++ {
+			up[i], frozen[i] = c.workers[i].up, c.workers[i].frozen
+		}
+		c.queue = QueueView{Pollers: visiblePollers(listed, time.Now(), up, frozen), Backlog: backlog}
 		c.mu.Unlock()
 	}
 }

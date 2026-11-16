@@ -2,6 +2,7 @@ package controller
 
 import (
 	"testing"
+	"time"
 
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
@@ -83,5 +84,24 @@ func TestThawFrozen(t *testing.T) {
 	}
 	if got := c.takeFrozen(); len(got) != 0 {
 		t.Fatalf("second takeFrozen = %v, want none", got)
+	}
+}
+
+func TestVisiblePollers(t *testing.T) {
+	now := time.Now()
+	up := [5]bool{false, true, true, false, true}
+	frozen := [5]bool{false, false, false, false, true}
+	listed := map[int]time.Time{
+		1: now.Add(-40 * time.Second), // up, idle long poll: shown
+		2: now.Add(-75 * time.Second), // too old: hidden
+		3: now.Add(-1 * time.Second),  // down: hidden
+		4: now.Add(-1 * time.Second),  // frozen: hidden
+	}
+	got := visiblePollers(listed, now, up, frozen)
+	if len(got) != 1 || got[0] != 1 {
+		t.Fatalf("visiblePollers = %v, want [1]", got)
+	}
+	if got := visiblePollers(nil, now, up, frozen); got == nil || len(got) != 0 {
+		t.Fatalf("empty = %#v, want non-nil empty", got)
 	}
 }

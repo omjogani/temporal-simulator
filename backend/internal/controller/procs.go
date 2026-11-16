@@ -99,6 +99,13 @@ func (c *Controller) freezeWorker(id int) bool {
 	if err := docker("pause", containerOf(id)); err != nil {
 		log.Printf("pause %s: %v", containerOf(id), err)
 	}
+	// An unpauseAll or kill may have run while docker pause was in flight; undo the late pause.
+	c.mu.Lock()
+	late := !w.frozen || !w.downUntil.Equal(until)
+	c.mu.Unlock()
+	if late {
+		_ = docker("unpause", containerOf(id))
+	}
 	time.AfterFunc(HammerDuration, func() {
 		c.mu.Lock()
 		stale := !w.frozen || !w.downUntil.Equal(until) // thawed by a step change or killed meanwhile
