@@ -62,6 +62,8 @@ type Controller struct {
 	banner     BannerView
 	loadCancel context.CancelFunc // non-nil while clients are placing orders
 	startKick  chan struct{}
+	idemKey    bool   // idioms: orders carry an idempotency key
+	build      string // idioms: "good" | "bad" workflow build
 }
 
 // New creates a controller. Temporal does not need to be up yet.
@@ -81,6 +83,8 @@ func New(cfg Config) (*Controller, error) {
 		step:      steps.Get(1),
 		pay:       newPayments(),
 		speed:     1,
+		idemKey:   true,
+		build:     "good",
 	}
 	for i := 1; i <= numWorkers; i++ {
 		c.workers[i] = &workerProc{id: i}
@@ -181,6 +185,7 @@ func (c *Controller) SetStep(n int, force bool) {
 	c.clientDone = [4]int{}
 	c.stats = StatsView{}
 	c.sched = "fifo"
+	c.resetSceneLocked()
 	c.banner = BannerView{Seq: c.banner.Seq + 1}
 	for i := 1; i <= numWorkers; i++ {
 		c.workers[i].completed = 0
@@ -192,6 +197,31 @@ func (c *Controller) SetStep(n int, force bool) {
 	if live {
 		// Fresh worker containers so nothing from the previous step lingers in their caches.
 		// Clients stay idle until the presenter presses Play (SetRunning).
+		go c.restartAllWorkers()
+	}
+}
+
+// resetSceneLocked restores the idioms scene switches. Caller holds mu.
+func (c *Controller) resetSceneLocked() {
+	c.idemKey = true
+	c.build = "good"
+}
+
+// SetScene flips the idioms switches. A changed build restarts all workers so
+// they boot with the new build.
+func (c *Controller) SetScene(idemKey *bool, build *string) {
+	c.mu.Lock()
+	if idemKey != nil {
+		c.idemKey = *idemKey
+	}
+	deploy := false
+	if build != nil && (*build == "good" || *build == "bad") && *build != c.build {
+		c.build = *build
+		deploy = true
+		c.say("Deploying the %s build: restarting all 4 worker containers.", c.build)
+	}
+	c.mu.Unlock()
+	if deploy {
 		go c.restartAllWorkers()
 	}
 }
@@ -272,6 +302,7 @@ func (c *Controller) snapshot() []byte {
 		Running:        c.loadCancel != nil,
 		TemporalUI:     c.cfg.TemporalUI,
 		Stats:          c.stats,
+		Scene:          SceneView{IdemKey: c.idemKey, Build: c.build},
 		Orders:         []*Order{},
 	}
 	for i := 1; i <= numWorkers; i++ {

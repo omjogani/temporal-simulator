@@ -117,6 +117,13 @@ type Snapshot struct {
 	Speed          float64          `json:"speed"`
 	Running        bool             `json:"running"` // clients are placing orders (the ▶ Play button)
 	TemporalUI     string           `json:"temporalUi"`
+	Scene          SceneView        `json:"scene"`
+}
+
+// SceneView carries the idioms scene switches.
+type SceneView struct {
+	IdemKey bool   `json:"idemKey"`
+	Build   string `json:"build"`
 }
 
 type TemporalView struct {

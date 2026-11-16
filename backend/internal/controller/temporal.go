@@ -295,12 +295,16 @@ func (c *Controller) starterLoop(ctx context.Context) {
 		}
 		step := c.step
 		actMs, stcMs := c.scaled(step.ActivityMs), c.scaled(step.StartToCloseMs)
+		courierMs := c.scaled(step.CourierWaitMs)
+		noIdem := !c.idemKey
 		c.mu.Unlock()
 
 		for _, o := range pending {
 			in := orders.OrderInput{
 				OrderID: o.ID, Num: o.Num, Client: o.Client, Declined: o.Declined,
 				ActivityMs: actMs, StartToCloseMs: stcMs, HeartbeatMs: step.HeartbeatMs, Retry: step.Retry,
+				NoIdempotencyKey: noIdem, CourierWaitMs: courierMs,
+				ScheduleToCloseMs: step.ScheduleToCloseMs, LateAfterMs: courierMs / 2,
 			}
 			sctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			_, err := c.tc.ExecuteWorkflow(sctx, client.StartWorkflowOptions{

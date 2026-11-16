@@ -70,7 +70,17 @@ type OrderInput struct {
 	StartToCloseMs int       `json:"startToCloseMs"`
 	HeartbeatMs    int       `json:"heartbeatMs"`
 	Retry          RetrySpec `json:"retry"`
+
+	// Idioms scenes.
+	NoIdempotencyKey  bool `json:"noIdempotencyKey"`
+	CourierWaitMs     int  `json:"courierWaitMs"`
+	ScheduleToCloseMs int  `json:"scheduleToCloseMs"`
+	LateAfterMs       int  `json:"lateAfterMs"`
 }
+
+// Build is the workflow build this worker process runs: "good" or "bad".
+// RunWorker sets it at boot from the controller's /internal/deploy.
+var Build = "good"
 
 // StepResult is returned by every activity.
 type StepResult struct {
