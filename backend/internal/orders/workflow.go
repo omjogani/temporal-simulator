@@ -21,6 +21,7 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 	startedAt := time.Now()
 	p := Progress{Done: []int{}}
 	paused := false
+	rw := newReplayWatch(ctx)
 
 	pauseCh := workflow.GetSignalChannel(ctx, SignalPause)
 	resumeCh := workflow.GetSignalChannel(ctx, SignalResume)
@@ -101,8 +102,9 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 			p.Paused = true
 			save()
 			if err := workflow.Await(ctx, func() bool { return !paused }); err != nil {
-				return "", err
+				return fail(err)
 			}
+			rw.check(ctx)
 			p.Paused = false
 			save()
 		}
@@ -142,6 +144,7 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 			}
 			return fail(err)
 		}
+		rw.check(ctx)
 		p.Done = append(p.Done, r.Worker)
 		save()
 		if i == ChargeStep && in.CourierWaitMs > 0 {
@@ -150,6 +153,7 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 			if err := workflow.Sleep(ctx, ms(in.CourierWaitMs)); err != nil {
 				return fail(err)
 			}
+			rw.check(ctx)
 			p.WaitUntil = 0
 			save()
 		}

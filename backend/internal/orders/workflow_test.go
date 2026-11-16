@@ -114,13 +114,29 @@ func TestLateGoodBuildShipsExpress(t *testing.T) {
 	old := Build
 	t.Cleanup(func() { Build = old })
 	Build = "good"
-	env := newEnv(t, "ShipExpress", "ShipOrder") // ShipOrder left unmocked: calling it fails the test
+	env := newEnv(t, "ShipExpress", "ShipOrder") // ShipOrder must never run
 	env.OnActivity("ShipExpress", mock.Anything, mock.Anything).Return(StepResult{Worker: 1}, nil).Once()
+	env.OnActivity("ShipOrder", mock.Anything, mock.Anything).Return(StepResult{Worker: 1}, nil).Maybe()
 	in := testInput()
 	in.LateAfterMs = 1000
 	in.CourierWaitMs = 2000
 	env.ExecuteWorkflow(OrderWorkflow, in)
 	require.NoError(t, env.GetWorkflowError())
 	require.True(t, queryProgress(t, env).Express)
+	env.AssertExpectations(t)
+	env.AssertNotCalled(t, "ShipOrder", mock.Anything, mock.Anything)
+}
+
+func TestCancelWhilePausedRunsCleanup(t *testing.T) {
+	env := newEnv(t, "ReleaseStock")
+	env.OnActivity("ReleaseStock", mock.Anything, mock.Anything).Return(StepResult{Worker: 1}, nil).Once()
+	env.RegisterDelayedCallback(func() { env.SignalWorkflow(SignalPause, nil) }, 100*time.Millisecond)
+	env.RegisterDelayedCallback(func() { env.CancelWorkflow() }, 5*time.Second)
+	in := testInput()
+	in.CourierWaitMs = 3000
+	env.ExecuteWorkflow(OrderWorkflow, in)
+	require.True(t, env.IsWorkflowCompleted())
+	require.True(t, temporal.IsCanceledError(env.GetWorkflowError()), "got %v", env.GetWorkflowError())
+	require.True(t, queryProgress(t, env).Canceled)
 	env.AssertExpectations(t)
 }

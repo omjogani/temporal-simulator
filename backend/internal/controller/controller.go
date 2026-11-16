@@ -307,7 +307,7 @@ func (c *Controller) snapshot() []byte {
 	}
 	for i := 1; i <= numWorkers; i++ {
 		w := c.workers[i]
-		s.Workers = append(s.Workers, WorkerView{ID: i, Up: w.up, DownUntil: unixMs(w.downUntil), Completed: w.completed})
+		s.Workers = append(s.Workers, WorkerView{ID: i, Up: w.up, DownUntil: unixMs(w.downUntil), Completed: w.completed, ReplayedAt: w.replayedAt, ReplayedEvents: w.replayedEvents})
 	}
 
 	kept := c.order[:0]

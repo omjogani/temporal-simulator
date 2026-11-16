@@ -18,6 +18,9 @@ type workerProc struct {
 	gen       int // bumps on every start/kill so stale callbacks can tell
 	downUntil time.Time
 	completed int
+
+	replayedAt     int64
+	replayedEvents int64
 }
 
 func containerOf(id int) string { return orders.ContainerName(id) }

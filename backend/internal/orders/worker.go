@@ -27,6 +27,11 @@ func RunWorker(id int, hostPort, controllerURL string) error {
 
 	fetchBuild(controllerURL)
 
+	emitter := &Activities{WorkerID: id, ControllerURL: controllerURL, HTTP: &http.Client{Timeout: 30 * time.Second}}
+	ReplayHook = func(workflowID string, events int64) {
+		emitter.emit(Event{Type: "replayed", WorkflowID: workflowID, Worker: id, Events: events})
+	}
+
 	w := worker.New(c, TaskQueue, worker.Options{
 		Identity:                           identity,
 		MaxConcurrentActivityExecutionSize: 1,

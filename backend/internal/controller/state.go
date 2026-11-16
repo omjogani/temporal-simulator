@@ -136,6 +136,10 @@ type WorkerView struct {
 	Up        bool  `json:"up"`
 	DownUntil int64 `json:"downUntil"`
 	Completed int   `json:"completed"`
+	// ReplayedAt is when this worker last rebuilt a workflow from history (unix ms),
+	// ReplayedEvents how many history events that replay read.
+	ReplayedAt     int64 `json:"replayedAt"`
+	ReplayedEvents int64 `json:"replayedEvents"`
 }
 
 type PaymentsView struct {

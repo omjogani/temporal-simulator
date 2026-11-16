@@ -113,7 +113,7 @@ type Progress struct {
 
 // Event is pushed by workers to the controller for live progress.
 type Event struct {
-	Type       string `json:"type"` // "started" | "finished"
+	Type       string `json:"type"` // "started" | "finished" | "replayed"
 	WorkflowID string `json:"workflowId"`
 	Step       int    `json:"step"`
 	Attempt    int    `json:"attempt"`
@@ -121,6 +121,7 @@ type Event struct {
 	DurationMs int    `json:"durationMs"`
 	Error      string `json:"error,omitempty"`
 	ErrorType  string `json:"errorType,omitempty"`
+	Events     int64  `json:"events,omitempty"` // "replayed": history events replayed
 }
 
 // WorkerNames are the pet names of the four workers (index = worker id, 1-based).

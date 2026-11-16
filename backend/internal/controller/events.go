@@ -13,6 +13,16 @@ func (c *Controller) applyEvent(ev orders.Event) {
 	if o == nil || o.terminal() {
 		return
 	}
+	if ev.Type == "replayed" {
+		if ev.Worker >= 1 && ev.Worker <= numWorkers {
+			w := c.workers[ev.Worker]
+			w.replayedAt = unixMs(time.Now())
+			w.replayedEvents = ev.Events
+		}
+		c.say("%s rebuilt order #%d by replaying %d events from history, then continued at %s.",
+			orders.WorkerName(ev.Worker), o.Num, ev.Events, stepName(o.Current))
+		return
+	}
 	if ev.Step == orders.CompensationStep {
 		o.ensureCompensation()
 	}
