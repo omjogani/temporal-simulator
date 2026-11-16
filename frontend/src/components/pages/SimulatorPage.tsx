@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
-import { BannerLine, Board, CodePanel, ConnectionNotice, HistoryStrip, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
+import { BannerLine, Board, CodeDrawer, CodePanel, ConnectionNotice, HistoryStrip, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { bubbleVisible, type Bubble } from "@/lib/bubble";
 import { activeAnchor } from "@/lib/code";
@@ -13,6 +13,7 @@ import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
+import { toggleCodeOpen } from "@/lib/codeOpen";
 import { IDIOMS, neighbours } from "@/lib/idioms";
 import { stepAccent, workerName, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
@@ -215,6 +216,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
         else if (has("flood")) action("flood");
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
+      else if (k === "k" && idiom && step.code) toggleCodeOpen();
       else if (k === "r") action("reset");
       else if (k === "m") sound.toggle();
       else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
@@ -273,9 +275,13 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }
-      overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
-      right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} code={step.code} active={anchor} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
-      wideRight={idiom && Boolean(step.code)}
+      overlay={
+        <>
+          {idiom && step.code && <CodeDrawer code={step.code} active={anchor} />}
+          {step.live && !view.connected && <ConnectionNotice />}
+        </>
+      }
+      right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
       strip={idiom ? <HistoryStrip orderId={selected} replayedBy={replayer ? workerName(replayer.id) : undefined} replayedAt={replayer ? live.snapshot?.workers.find((w) => w.id === replayer.id)?.replayedAt : undefined} /> : undefined}
       caption={<TryThis text={step.tryThis} />}
       banner={<BannerLine text={bannerText} />}

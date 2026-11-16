@@ -8,7 +8,7 @@ import type { ActionId, ArenaView, PanelsView, PaymentsView, SchedMode, ToolId }
 import styles from "./organisms.module.css";
 
 export { Board } from "./board/Board";
-export { CodePanel } from "./CodePanel";
+export { CodeDrawer, CodePanel } from "./CodePanel";
 export { HistoryStrip } from "./HistoryStrip";
 
 /** Left scoreboard: one row per worker (orders completed), plus the step's one extra fact. */
