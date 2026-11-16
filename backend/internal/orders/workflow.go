@@ -4,11 +4,27 @@ import (
 	"errors"
 	"time"
 
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
 func ms(n int) time.Duration { return time.Duration(n) * time.Millisecond }
+
+// gaveUpOn names the timeout that ended an activity's retries ("ScheduleToClose", ...), or "".
+// When the next retry would pass schedule-to-close, the server fails the activity with
+// RetryState TIMEOUT instead of timing it out, so that is checked first.
+func gaveUpOn(err error) string {
+	var rs interface{ RetryState() enumspb.RetryState }
+	if errors.As(err, &rs) && rs.RetryState() == enumspb.RETRY_STATE_TIMEOUT {
+		return enumspb.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE.String()
+	}
+	var te *temporal.TimeoutError
+	if errors.As(err, &te) {
+		return te.TimeoutType().String()
+	}
+	return ""
+}
 
 // OrderWorkflow runs Reserve stock → Charge card → Ship order → Send email.
 //
@@ -82,7 +98,7 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 
 	// fail handles cancellation and schedule-to-close give-ups, then returns err.
 	fail := func(err error) (string, error) {
-		var te *temporal.TimeoutError
+		gaveUp := gaveUpOn(err)
 		switch {
 		case temporal.IsCanceledError(err):
 			dctx, _ := workflow.NewDisconnectedContext(ctx)
@@ -90,8 +106,8 @@ func OrderWorkflow(ctx workflow.Context, in OrderInput) (string, error) {
 			_ = workflow.ExecuteActivity(dctx, ActivityNames[CompensationStep], in).Get(dctx, nil)
 			p.Canceled = true
 			_ = workflow.UpsertMemo(dctx, map[string]any{MemoKey: p})
-		case errors.As(err, &te):
-			p.GaveUp = te.TimeoutType().String()
+		case gaveUp != "":
+			p.GaveUp = gaveUp
 			save()
 		}
 		return "", err

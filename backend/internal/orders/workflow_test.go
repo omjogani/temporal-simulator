@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -108,6 +109,21 @@ func TestScheduleToCloseGivesUp(t *testing.T) {
 	env.ExecuteWorkflow(OrderWorkflow, in)
 	require.Error(t, env.GetWorkflowError())
 	require.Equal(t, "ScheduleToClose", queryProgress(t, env).GaveUp)
+}
+
+// retryStateErr stands in for the server's ActivityError, which the SDK cannot build in tests.
+type retryStateErr struct{ rs enumspb.RetryState }
+
+func (e retryStateErr) Error() string                  { return "activity error" }
+func (e retryStateErr) RetryState() enumspb.RetryState { return e.rs }
+
+// Real Temporal ends retries whose next attempt would pass schedule-to-close with
+// ActivityTaskFailed and RetryState TIMEOUT (seen live in scene 106), not a TimeoutError.
+func TestGaveUpOn(t *testing.T) {
+	require.Equal(t, "ScheduleToClose", gaveUpOn(retryStateErr{enumspb.RETRY_STATE_TIMEOUT}))
+	require.Equal(t, "", gaveUpOn(retryStateErr{enumspb.RETRY_STATE_NON_RETRYABLE_FAILURE}))
+	require.Equal(t, "Heartbeat", gaveUpOn(temporal.NewTimeoutError(enumspb.TIMEOUT_TYPE_HEARTBEAT, nil)))
+	require.Equal(t, "", gaveUpOn(errors.New("boom")))
 }
 
 func TestLateGoodBuildShipsExpress(t *testing.T) {
