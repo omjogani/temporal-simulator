@@ -14,6 +14,8 @@ import type {
 import type { SnapOrder, SnapStep, Snapshot } from "./snapshot";
 
 const secs = (ms: number) => `${Math.max(0, Math.ceil(ms / 1000))}s`;
+const REPLAY_SHOW_MS = 6000;
+const TIMEOUT_TAG = { "start-to-close": "start-to-close ⏱", heartbeat: "heartbeat ⏱", "schedule-to-close": "schedule-to-close ⏱" } as const;
 const LANE_LABELS = ["C1 VIP", "C2", "C3", "C4 bulk"];
 
 /** Share of a running activity done, 0..1. Clamped: the browser's estimate of server time can lag `startedAt`. */
@@ -62,9 +64,14 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
     const down = !w.up;
     let status = "idle";
     let statusTone: WorkerCardView["statusTone"] = "dim";
+    const frozen = w.up && w.frozen;
+    const replayAgo = now - w.replayedAt;
     if (down) {
       status = w.downUntil > now ? `DOWN · ${secs(w.downUntil - now)}` : "starting…";
       statusTone = "bad";
+    } else if (frozen) {
+      status = `FROZEN · ${secs(w.downUntil - now)}`;
+      statusTone = "gold";
     } else if (running) {
       status = "running";
       statusTone = "good";
@@ -84,6 +91,9 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
       rows: o ? o.steps.map((st, i) => row(st, i, now, tUp, ghost)) : placeholder(),
       footer: `✓ ${w.completed} completed`,
       container: workerContainer(w.id),
+      replayed: w.replayedAt > 0 && replayAgo >= 0 && replayAgo < REPLAY_SHOW_MS ? { events: w.replayedEvents, ago: replayAgo } : undefined,
+      frozen: frozen || undefined,
+      polling: s.queue?.pollers.includes(w.id),
     };
   });
 
@@ -97,8 +107,15 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
   let retrying = 0;
   const paused: SnapOrder[] = [];
   for (const o of s.orders) {
-    const ring = o.charged > 0 ? "charged" : "none";
-    const base = { id: o.id, client: o.client, declined: o.declined };
+    const ring = o.stuck ? "stuck" : o.charged > 1 ? "dup" : o.charged > 0 ? "charged" : "none";
+    const base = {
+      id: o.id,
+      client: o.client,
+      declined: o.declined,
+      ...(o.giftWrap ? { bow: true } : {}),
+      ...(o.stuck ? { stamp: "stuck" as const } : {}),
+      ...(o.timeout ? { tag: TIMEOUT_TAG[o.timeout] } : {}),
+    };
     switch (o.status) {
       case "holding":
         dots.push({ ...base, loc: { kind: "client", client: o.client, slot: holdSlot[o.client]++ }, ring });
@@ -112,17 +129,18 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
         const isRetry = o.status === "backoff";
         // A retrying activity is not in the task queue: Temporal holds it as a timer
         // and only puts it back on the queue when the backoff runs out.
+        const sleeping = !isRetry && o.waitUntil > now;
         const loc = cfg.lanes
           ? { kind: "hub" as const, slot: laneSlot[o.client]++, lane: o.client }
-          : isRetry
+          : isRetry || sleeping
             ? { kind: "hub" as const, slot: timerSlot++, timer: true }
             : { kind: "hub" as const, slot: hubSlot++ };
         dots.push({
           ...base,
           loc,
           ring: isRetry ? "retry" : ring,
-          label: isRetry && st?.nextRetryAt ? secs(st.nextRetryAt - now) : undefined,
-          hidden: loc.slot >= (cfg.lanes ? HUB_IN.laneCells : isRetry ? HUB_IN.timers : HUB_IN.cells),
+          label: sleeping ? secs(o.waitUntil - now) : isRetry && st?.nextRetryAt ? secs(st.nextRetryAt - now) : undefined,
+          hidden: loc.slot >= (cfg.lanes ? HUB_IN.laneCells : isRetry || sleeping ? HUB_IN.timers : HUB_IN.cells),
         });
         break;
       }
@@ -145,6 +163,9 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
       case "lost":
         dots.push({ ...base, loc: { kind: "gone" }, ring: "none", fate: "lost" });
         break;
+      case "canceled":
+        dots.push({ ...base, loc: { kind: "gone" }, ring: "none", fate: "canceled" });
+        break;
     }
   }
 
@@ -155,6 +176,7 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
     dup: s.stats.duplicates,
     failed: s.stats.failed,
     paused: s.stats.paused,
+    canceled: s.stats.canceled,
   };
   const score: ScoreItemView[] = cfg.score.map((k) => {
     const v = values[k];
@@ -228,6 +250,8 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
     connected,
     sched: s.sched,
     temporalUi: s.temporalUi,
+    queue: s.queue,
+    scene: s.scene,
   };
 }
 

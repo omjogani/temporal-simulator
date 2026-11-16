@@ -143,6 +143,7 @@ export const SCORE_META: Record<ScoreKey, { label: string; tone: "good" | "bad" 
   dup: { label: "Duplicate charges", tone: "bad" },
   failed: { label: "Failed cleanly", tone: "gold" },
   paused: { label: "Paused", tone: "gold" },
+  canceled: { label: "Canceled", tone: "neutral" },
 };
 
 /** Worker pet names (index = worker id - 1). Must match backend/internal/orders WorkerNames. */

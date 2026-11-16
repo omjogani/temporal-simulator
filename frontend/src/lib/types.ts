@@ -17,7 +17,7 @@ export type ActionId =
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
 export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}`;
-export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused";
+export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused" | "canceled";
 
 export type RowState =
   | "placeholder"
@@ -52,6 +52,11 @@ export interface WorkerCardView {
   footer: string;
   /** Docker container name, on live steps where the worker really runs in Docker. */
   container?: string;
+  /** Last workflow rebuilt from history on this worker, shown for a few seconds. */
+  replayed?: { events: number; ago: number };
+  frozen?: boolean;
+  /** Temporal lists this worker as polling the task queue. */
+  polling?: boolean;
 }
 
 export type Loc =
@@ -61,18 +66,21 @@ export type Loc =
   | { kind: "side"; slot: number }
   | { kind: "gone" };
 
-export type Ring = "none" | "charged" | "dup" | "ghost" | "done" | "failed" | "retry";
+export type Ring = "none" | "charged" | "dup" | "ghost" | "done" | "failed" | "retry" | "stuck";
 
 export interface DotView {
   id: string;
   client: number; // 0-based
   loc: Loc;
   ring: Ring;
-  fate?: "done" | "lost" | "failed";
+  fate?: "done" | "lost" | "failed" | "canceled";
   declined?: boolean;
   ghost?: boolean;
   hidden?: boolean;
   label?: string; // small text next to the dot (e.g. retry countdown)
+  bow?: boolean; // gift-wrapped order
+  stamp?: "stuck";
+  tag?: string; // e.g. "heartbeat ⏱"
 }
 
 export interface HubView {
@@ -153,6 +161,8 @@ export interface ArenaView {
   connected: boolean;
   sched: SchedMode;
   temporalUi?: string;
+  queue?: { pollers: number[]; backlog: number };
+  scene?: { idemKey: boolean; build: "good" | "bad" };
 }
 
 export interface ArenaControls {

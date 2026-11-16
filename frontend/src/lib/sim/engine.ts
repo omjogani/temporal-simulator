@@ -248,7 +248,7 @@ export class QueueSim {
     }
 
     const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: 0, paused: 0 };
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: 0, paused: 0, canceled: 0 };
     const score: ScoreItemView[] = cfg.score.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
 
     const hubDown = now < this.hubDown;

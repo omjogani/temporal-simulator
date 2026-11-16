@@ -9,7 +9,8 @@ export type FxEvent =
   | { kind: "hubDown" | "hubUp" }
   | { kind: OrderFx; id: string; client: number };
 
-const FATE_EVENT: Record<NonNullable<DotView["fate"]>, OrderFx> = {
+// "canceled" has no effect yet (Task 11).
+const FATE_EVENT: Partial<Record<NonNullable<DotView["fate"]>, OrderFx>> = {
   done: "orderDone",
   lost: "orderLost",
   failed: "orderFailed",
@@ -44,7 +45,8 @@ export function diffViews(prev: ArenaView | null, next: ArenaView): FxEvent[] {
   for (const d of next.dots) {
     const p = old.get(d.id);
     if (!p || quiet(d) || quiet(p)) continue;
-    if (d.fate && !p.fate) out.push({ kind: FATE_EVENT[d.fate], id: d.id, client: d.client });
+    const fateFx = d.fate && FATE_EVENT[d.fate];
+    if (fateFx && !p.fate) out.push({ kind: fateFx, id: d.id, client: d.client });
     const ring = RING_EVENT[d.ring];
     if (ring && d.ring !== p.ring) out.push({ kind: ring, id: d.id, client: d.client });
   }

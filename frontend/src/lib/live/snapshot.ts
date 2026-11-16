@@ -11,7 +11,8 @@ export type OrderStatus =
   | "paused"
   | "completed"
   | "failed"
-  | "lost";
+  | "lost"
+  | "canceled";
 
 export interface SnapStep {
   state: StepState;
@@ -35,6 +36,13 @@ export interface SnapOrder {
   charged: number;
   pauseRequested: boolean;
   endedAt?: number;
+  giftWrap: boolean;
+  address: string;
+  /** Unix ms the workflow sleeps until; 0 when it is not sleeping. */
+  waitUntil: number;
+  express: boolean;
+  timeout: "" | "start-to-close" | "heartbeat" | "schedule-to-close";
+  stuck: "" | "nondeterminism";
 }
 
 export interface Snapshot {
@@ -42,10 +50,18 @@ export interface Snapshot {
   step: number;
   live: boolean;
   temporal: { up: boolean; downUntil: number };
-  workers: { id: number; up: boolean; downUntil: number; completed: number }[];
+  workers: {
+    id: number;
+    up: boolean;
+    downUntil: number;
+    frozen: boolean;
+    completed: number;
+    replayedAt: number;
+    replayedEvents: number;
+  }[];
   payments: { downUntil: number; slowUntil: number; charges: number; deduped: number; failures: number };
   orders: SnapOrder[];
-  stats: { done: number; failed: number; lost: number; duplicates: number; inflight: number; paused: number };
+  stats: { done: number; failed: number; lost: number; canceled: number; duplicates: number; inflight: number; paused: number };
   sched: "fifo" | "priority" | "fair";
   waits: number[];
   clientDone: number[];
@@ -55,4 +71,6 @@ export interface Snapshot {
   speed: number;
   running: boolean;
   temporalUi: string;
+  scene: { idemKey: boolean; build: "good" | "bad" };
+  queue: { pollers: number[]; backlog: number };
 }
