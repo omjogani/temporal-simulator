@@ -19,8 +19,17 @@ The talk has two acts, one URL per step:
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
 | `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
 | `/5` | Temporal | Pause and resume workflows | **Real Temporal** |
+| `/idioms` | Idioms | Section intro: eight scenes on the programming model | |
+| `/idioms/1` | Idioms | Workflow vs activity: workflows decide, activities do | **Real Temporal** |
+| `/idioms/2` | Idioms | Event history and replay (real replay events from workers) | **Real Temporal** |
+| `/idioms/3` | Idioms | Retryable (500) vs non-retryable (declined) errors, compensation | **Real Temporal** |
+| `/idioms/4` | Idioms | Idempotency key on/off: a retried charge after a kill | **Real Temporal** |
+| `/idioms/5` | Idioms | Determinism: deploy a `time.Now()` build, real non-determinism error | **Real Temporal** |
+| `/idioms/6` | Idioms | Timeouts: start-to-close, heartbeat (`docker pause`), schedule-to-close | **Real Temporal** |
+| `/idioms/7` | Idioms | Workers poll task queues: pollers and backlog from `DescribeTaskQueue` | **Real Temporal** |
+| `/idioms/8` | Idioms | Signal, query, update, cancel on a running order | **Real Temporal** |
 
-Rule: anything shown in Act 2 must be real Temporal behaviour, not simulated. Act 1 is allowed
+Rule: anything shown in Act 2 or the Idioms section must be real Temporal behaviour, not simulated. Act 1 is allowed
 to be a pure illustration.
 
 Design prototype (single HTML page that the app is built from):
@@ -35,13 +44,15 @@ temporal/dynamicconfig.yaml  priority + fairness switches for the server
 backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
-  internal/steps/         per-step config for the live steps (2-5)
+  internal/steps/         per-step config for the live steps (2-5) and idiom scenes (101-108)
   internal/controller/    HTTP + WebSocket API, worker container manager, docker hammer,
                           fake Payments API, client load generator, state registry
 frontend/                 Next.js (App Router, TypeScript), atomic design
   src/components/atoms|molecules|organisms|templates
   src/app/[step]/         one route per step
-  src/lib/                step configs, board geometry, Act 1 simulation, live adapter
+  src/app/idioms/[scene]/ one route per idiom scene (1-8); `src/app/idioms/` is the section intro
+  src/lib/                step configs, board geometry, Act 1 simulation, live adapter;
+                          `idioms.ts` holds scene configs (rule, tools, switches, code, tryThis)
   src/lib/fx/             effects from diffing ArenaViews (events, effects, particles), sound
   src/lib/pets.ts         the four worker pets and their poses
 ```
@@ -67,6 +78,26 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 - The controller hosts a fake Payments API with fault switches (down = 500s, slow = 5 s,
   declined card = 402 non-retryable). It dedups by idempotency key (the workflow ID).
 - The browser gets one state snapshot about 10 times a second over `ws://localhost:18080/ws`.
+
+## How the idioms scenes work
+
+- Scenes run as controller steps 101-108 (`/idioms/N` sets step `100+N`) on the same
+  `OrderWorkflow`, extended with a `giftWrap` signal, a `changeAddress` update (validator
+  rejects once Ship is recorded), cancellation cleanup and an optional courier-wait timer.
+- Workers report real replays (`workflow.IsReplaying`) to the controller; the board shows a
+  replay sweep only when one happened.
+- Determinism (scene 5): workers read the deployed build (`good` | `bad`) from
+  `GET /internal/deploy` at boot; deploying restarts `worker-*`. The `bad` build calls
+  `time.Now()` on purpose and is the only non-deterministic workflow code allowed.
+- Endpoints added for the idioms:
+  - `POST /api/scene` `{idemKey?, build?}`: idempotency-key switch and build deploy.
+  - `POST /api/order` `{id, op, arg}`, op = `signal` | `query` | `update` | `cancel` |
+    `inject` (arg `500` or `declined`): returns the real reply `{ok, text, tone}`.
+  - `POST /api/freeze` `{worker}`: `docker pause` one worker (heartbeat timeout), then unpause.
+  - `GET /api/history?id=<workflowId>`: trimmed event history for the history strip.
+  - `POST /api/payments` also takes `downLong` (500s for 20 s, schedule-to-close).
+- The snapshot also carries task queue pollers and backlog, the deployed build, replay
+  events, timeouts and stuck workflow tasks.
 
 ## Ports and the other local Temporal
 
@@ -122,10 +153,13 @@ cd frontend && pnpm test && pnpm lint && pnpm build
   (`FxCanvas`). Effects come from diffing consecutive `ArenaView`s (`src/lib/fx/events.ts`),
   never from extra backend fields. Keys: ← → steps, `Esc` menu, `H` `P` tools, `F` `A` `Z` `S`
   `D` actions, `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
+  In idioms scenes: `1`-`8` jump to a scene, tools `V` select, `H` hammer, `E` error, `G` signal,
+  `Q` query, `U` update, `X` cancel, `C` freeze, and `L` payments down 20 s.
 - **Presentation-first UI:** the screen is projected during a talk. Keep side panels minimal,
   numbers large, colours meaningful (gold = charged / retrying, red = lost / duplicate,
   green = done). Don't add dense debug info to the main view.
 - **Backend:** standard library HTTP, `go.temporal.io/sdk`, `github.com/coder/websocket`.
-  Keep workflow code deterministic; all I/O goes in activities.
+  Keep workflow code deterministic (except the deliberate `bad` build of idioms scene 5);
+  all I/O goes in activities.
 - **Honesty:** if the UI claims something about Temporal, it must match real Temporal
   semantics (at-least-once activities, retries handed to any healthy worker, etc.).

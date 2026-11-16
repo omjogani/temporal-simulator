@@ -12,6 +12,14 @@ take the Payments API down, flood the system. The scoreboards show what survives
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | Real Temporal |
 | `/4` | Temporal | Task queue priority and fairness | Real Temporal |
 | `/5` | Temporal | Pause and resume workflows | Real Temporal |
+| `/idioms/1` | Idioms | Workflow vs activity | Real Temporal |
+| `/idioms/2` | Idioms | Event history and replay | Real Temporal |
+| `/idioms/3` | Idioms | Retryable vs non-retryable errors, compensation | Real Temporal |
+| `/idioms/4` | Idioms | Idempotency: activities run at least once | Real Temporal |
+| `/idioms/5` | Idioms | Determinism: a `time.Now()` build breaks replay | Real Temporal |
+| `/idioms/6` | Idioms | Start-to-close, heartbeat and schedule-to-close timeouts | Real Temporal |
+| `/idioms/7` | Idioms | Workers poll task queues | Real Temporal |
+| `/idioms/8` | Idioms | Signal, query, update and cancel | Real Temporal |
 
 ## Run it
 
@@ -25,6 +33,11 @@ make dev    # Go controller on :18080 (drives the workers) + Next.js on :13000
 Open <http://localhost:13000/> and pick a scenario cartridge (← → to choose, Enter to start,
 `1`–`5` to jump straight in). Inside a step, ← → move between steps and `Esc` returns to the menu.
 `M` turns the sound effects on or off (off by default).
+
+The **Idioms** cartridge (after step 5) opens eight short scenes, each with a rule, the Go code
+that embodies it and the selected order's real event history. Inside it, `1`–`8` jump to a scene
+and the tools are `V` select, `H` hammer, `E` error, `G` signal, `Q` query, `U` update, `X` cancel
+and `C` freeze (`docker pause`). Click a parcel to act on that order.
 
 Every step loads paused: press **▶ Play** (or Space) to start the clients placing orders, and
 again to pause them (orders in flight finish). The **Speed** slider (or `-` / `+`) changes how fast orders move, from 0.25× to 2×: dot travel,
