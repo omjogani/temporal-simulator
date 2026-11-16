@@ -74,6 +74,16 @@ func (c *Controller) routes() http.Handler {
 		}
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /api/freeze", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			Worker int `json:"worker"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": c.freezeWorker(b.Worker)})
+	})
+	mux.HandleFunc("GET /api/history", c.handleHistory)
 	mux.HandleFunc("POST /api/payments", func(w http.ResponseWriter, r *http.Request) {
 		var b struct {
 			Mode string `json:"mode"`

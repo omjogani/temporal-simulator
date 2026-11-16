@@ -64,6 +64,7 @@ type Controller struct {
 	startKick  chan struct{}
 	idemKey    bool   // idioms: orders carry an idempotency key
 	build      string // idioms: "good" | "bad" workflow build
+	queue      QueueView
 }
 
 // New creates a controller. Temporal does not need to be up yet.
@@ -106,6 +107,8 @@ func (c *Controller) Run(ctx context.Context) error {
 	go c.dockerWatchLoop(ctx.Done())
 	go c.healthLoop(ctx)
 	go c.pollLoop(ctx)
+	go c.describeLoop(ctx)
+	go c.queueLoop(ctx)
 	go c.starterLoop(ctx)
 	go c.broadcastLoop(ctx)
 	go c.terminateRunning(context.Background())
@@ -197,7 +200,10 @@ func (c *Controller) SetStep(n int, force bool) {
 	if live {
 		// Fresh worker containers so nothing from the previous step lingers in their caches.
 		// Clients stay idle until the presenter presses Play (SetRunning).
-		go c.restartAllWorkers()
+		go func() {
+			c.unpauseAll()
+			c.restartAllWorkers()
+		}()
 	}
 }
 
@@ -308,11 +314,12 @@ func (c *Controller) snapshot() []byte {
 		TemporalUI:     c.cfg.TemporalUI,
 		Stats:          c.stats,
 		Scene:          SceneView{IdemKey: c.idemKey, Build: c.build},
+		Queue:          c.queue,
 		Orders:         []*Order{},
 	}
 	for i := 1; i <= numWorkers; i++ {
 		w := c.workers[i]
-		s.Workers = append(s.Workers, WorkerView{ID: i, Up: w.up, DownUntil: unixMs(w.downUntil), Completed: w.completed, ReplayedAt: w.replayedAt, ReplayedEvents: w.replayedEvents})
+		s.Workers = append(s.Workers, WorkerView{ID: i, Up: w.up, DownUntil: unixMs(w.downUntil), Frozen: w.frozen, Completed: w.completed, ReplayedAt: w.replayedAt, ReplayedEvents: w.replayedEvents})
 	}
 
 	kept := c.order[:0]

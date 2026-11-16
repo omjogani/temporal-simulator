@@ -125,6 +125,7 @@ type Snapshot struct {
 	Running        bool             `json:"running"` // clients are placing orders (the ▶ Play button)
 	TemporalUI     string           `json:"temporalUi"`
 	Scene          SceneView        `json:"scene"`
+	Queue          QueueView        `json:"queue"`
 }
 
 // SceneView carries the idioms scene switches.
@@ -142,6 +143,7 @@ type WorkerView struct {
 	ID        int   `json:"id"`
 	Up        bool  `json:"up"`
 	DownUntil int64 `json:"downUntil"`
+	Frozen    bool  `json:"frozen"`
 	Completed int   `json:"completed"`
 	// ReplayedAt is when this worker last rebuilt a workflow from history (unix ms),
 	// ReplayedEvents how many history events that replay read.
