@@ -31,6 +31,9 @@ func (a *Activities) ChargeCard(ctx context.Context, in OrderInput) (StepResult,
 func (a *Activities) ShipOrder(ctx context.Context, in OrderInput) (StepResult, error) {
 	return a.run(ctx, in, 2)
 }
+func (a *Activities) ShipExpress(ctx context.Context, in OrderInput) (StepResult, error) {
+	return a.run(ctx, in, ShipStep)
+}
 func (a *Activities) SendEmail(ctx context.Context, in OrderInput) (StepResult, error) {
 	return a.run(ctx, in, 3)
 }
