@@ -34,6 +34,10 @@
   align-items: start;
   padding: 12px; /* the stage shows around the panels */
 }
+/* Idiom scenes: the code panel needs room; the board scales down with its column. */
+.wideRight {
+  grid-template-columns: 210px minmax(0, 1fr) 460px;
+}
 /* The illustrated stage behind everything in the grid. */
 .backdrop {
   position: absolute;

@@ -150,14 +150,16 @@
 .code {
   margin: 0;
   display: grid;
-  overflow-x: auto;
-  font: 500 calc(var(--fs-md) + 2px) / 1.5 var(--font-mono);
+  font: 500 var(--fs-md) / 1.5 var(--font-mono);
   color: var(--c-dim);
 }
 .code code {
   display: block;
-  white-space: pre;
-  padding: 0 6px;
+  /* Long lines wrap with a hanging indent instead of scrolling sideways. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0 6px 0 calc(6px + 4ch);
+  text-indent: -4ch;
   border-left: 3px solid transparent;
 }
 .code code[data-active="true"] {

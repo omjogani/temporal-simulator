@@ -275,6 +275,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       }
       overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
       right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} code={step.code} active={anchor} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
+      wideRight={idiom && Boolean(step.code)}
       strip={idiom ? <HistoryStrip orderId={selected} replayedBy={replayer ? workerName(replayer.id) : undefined} replayedAt={replayer ? live.snapshot?.workers.find((w) => w.id === replayer.id)?.replayedAt : undefined} /> : undefined}
       caption={<TryThis text={step.tryThis} />}
       banner={<BannerLine text={bannerText} />}
