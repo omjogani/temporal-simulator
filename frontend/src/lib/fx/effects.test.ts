@@ -28,6 +28,12 @@ describe("anchor / nodeAnchor", () => {
     expect(nodeAnchor("side")).toEqual({ x: SIDE.x, y: SIDE.y });
     expect(nodeAnchor("c:0")).toEqual({ x: CLIENTS[0].x, y: CLIENTS[0].y });
   });
+
+  test("nodeAnchor for a parcel is its placed position, or nowhere", () => {
+    expect(nodeAnchor("o:a", placed)).toEqual({ x: 412, y: 233 });
+    expect(nodeAnchor("o:zz", placed)).toBeNull();
+    expect(nodeAnchor("o:a")).toBeNull();
+  });
 });
 
 describe("spawn", () => {

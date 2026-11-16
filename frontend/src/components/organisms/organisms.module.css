@@ -133,3 +133,120 @@
 .notice {
   border-color: var(--c-fault);
 }
+
+/* ---- code panel ---- */
+.codePanel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.rule {
+  margin: 0;
+  font: 800 var(--fs-lg) / 1.1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--c-gold);
+}
+.code {
+  margin: 0;
+  display: grid;
+  overflow-x: auto;
+  font: 500 11px / 1.55 var(--font-mono);
+  color: var(--c-dim);
+}
+.code code {
+  display: block;
+  white-space: pre;
+  padding: 0 6px;
+  border-left: 3px solid transparent;
+}
+.code code[data-active="true"] {
+  background: color-mix(in srgb, var(--c-gold) 18%, transparent);
+  border-left-color: var(--c-gold);
+  color: var(--c-ink);
+}
+.scoreRow {
+  display: flex;
+  gap: 14px;
+}
+.scoreRow > * {
+  border-bottom: 0;
+  padding: 0;
+}
+
+/* ---- history strip ---- */
+.history {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 46px;
+  padding: 8px 12px;
+  overflow: hidden;
+  background: var(--c-glass);
+  border: 1px solid var(--c-glass-line);
+  border-radius: var(--radius-md);
+  font: 500 var(--fs-sm) / 1 var(--font-mono);
+}
+.history[data-empty] {
+  justify-content: center;
+  color: var(--c-dim);
+}
+.chip {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  color: var(--c-dim);
+}
+.chip[data-tone="ok"] {
+  color: var(--c-ok);
+}
+.chip[data-tone="gold"] {
+  color: var(--c-gold);
+}
+.chip[data-tone="bad"] {
+  color: var(--c-fault);
+}
+.chip[data-tone="blue"] {
+  color: var(--c-client-3);
+}
+.chip[data-new="true"] {
+  animation: chipIn 0.35s ease-out;
+}
+@keyframes chipIn {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+.sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 70px;
+  left: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c-gold) 55%, transparent), transparent);
+  animation: sweep 1.4s ease-in-out 1 forwards;
+  pointer-events: none;
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-70px);
+  }
+  to {
+    transform: translateX(1100px);
+    opacity: 0;
+  }
+}
+.replayTag {
+  position: absolute;
+  left: 12px;
+  top: 4px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+}

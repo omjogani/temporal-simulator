@@ -41,3 +41,5 @@ export function UrlPill({ host, path }: { host: string; path: string }) {
 export function Label({ children }: { children: ReactNode }) {
   return <span className={styles.label}>{children}</span>;
 }
+
+export { Switch } from "./Switch";

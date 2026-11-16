@@ -4,7 +4,7 @@ import { api } from "./api";
 afterEach(() => vi.unstubAllGlobals());
 
 test("api.order posts {id, op, arg} and returns the reply", async () => {
-  const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, text: "shipping", tone: "good" }) });
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, text: "shipping", tone: "good" }) });
   vi.stubGlobal("fetch", fetchMock);
   const reply = await api.order("o7", "update", "x");
   const [url, init] = fetchMock.mock.calls[0];
@@ -18,6 +18,12 @@ test("api.order answers with a gold bubble when the controller is unreachable", 
   const reply = await api.order("o7", "query");
   expect(reply.ok).toBe(false);
   expect(reply.tone).toBe("gold");
+});
+
+test("api.order answers with a gold bubble when the controller replies with an error status", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }));
+  const reply = await api.order("o7", "query");
+  expect(reply).toEqual({ ok: false, text: "Controller error, try again", tone: "gold" });
 });
 
 test("api.freeze posts the worker", async () => {

@@ -1,19 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
-import { BannerLine, Board, ConnectionNotice, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
+import { BannerLine, Board, CodePanel, ConnectionNotice, HistoryStrip, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { bubbleVisible, type Bubble } from "@/lib/bubble";
+import { activeAnchor } from "@/lib/code";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
 import { IDIOMS, neighbours } from "@/lib/idioms";
-import { stepAccent, type StepConfig } from "@/lib/steps";
+import { stepAccent, workerName, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
@@ -34,6 +35,9 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [errorMode, setErrorMode] = useState<"500" | "declined">("500");
   const [bubble, setBubble] = useState<Bubble | null>(null);
+  // Replies to parcel clicks: a counter drops a slow earlier reply that arrives after a newer one.
+  const sentSeq = useRef(0);
+  const shownSeq = useRef(0);
   const [frozen, setFrozen] = useState(false);
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
@@ -65,6 +69,11 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     const serverNow = wall + live.offset;
     view = liveView(live.snapshot, step, serverNow, live.connected);
   } else view = emptyLiveView(step, live.connected);
+
+  const nowRef = useRef(now);
+  useEffect(() => {
+    nowRef.current = now;
+  });
 
   const dots = place(view.dots, now, speed);
   // Act 1 swaps the sim object on Reset; live steps count resets.
@@ -107,8 +116,12 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       }
       const op = tool === "error" ? "inject" : tool;
       if (op !== "inject" && op !== "signal" && op !== "query" && op !== "update" && op !== "cancel") return;
-      const at = now;
-      void api.order(id, op, op === "inject" ? errorMode : undefined).then((r) => setBubble({ orderId: id, text: r.text, tone: r.tone, at }));
+      const seq = ++sentSeq.current;
+      void api.order(id, op, op === "inject" ? errorMode : undefined).then((r) => {
+        if (seq < shownSeq.current) return;
+        shownSeq.current = seq;
+        setBubble({ orderId: id, text: r.text, tone: r.tone, at: nowRef.current });
+      });
       return;
     }
     if (!step.live) {
@@ -140,6 +153,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);
     else if (a === "payDown") void api.payments("down");
     else if (a === "paySlow") void api.payments("slow");
+    else if (a === "payDownLong") void api.payments("downLong");
     else if (a === "hammerAll") void api.hammerWorkers();
     else if (a === "pauseAll") void api.pause();
     else if (a === "resumeAll") void api.resume();
@@ -153,6 +167,12 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     if (step.live) void api.run(!playing);
     else sim?.setRunning(!playing);
   };
+
+  // Idiom scenes: the code line the selected order is on, and which worker last replayed it.
+  const idiom = step.section === "idioms";
+  const selOrder = idiom && selected ? live.snapshot?.orders.find((o) => o.id === selected) : undefined;
+  const anchor = activeAnchor(selOrder, wall + live.offset, step.id);
+  const replayer = selOrder ? view.workers.find((w) => w.id === selOrder.worker && w.replayed) : undefined;
 
   // Keyboard: ← → steps, tool and action hotkeys, space to freeze (Act 1).
   useEffect(() => {
@@ -188,6 +208,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       } else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
       else if (k === "z" && has("payDown")) action("payDown");
       else if (k === "s" && has("paySlow")) action("paySlow");
+      else if (k === "l" && has("payDownLong")) action("payDownLong");
       else if (k === "p" && step.tools.includes("pause")) setTool("pause");
       else if (k === "f") {
         if (has("bulk")) action("bulk");
@@ -240,18 +261,21 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
           onFreeze={() => setFrozen((f) => !f)}
           muted={sound.muted}
           onSound={sound.toggle}
+          scene={view.scene}
+          onSwitch={(s) => void api.scene(s)}
           errorMode={tool === "error" || step.tools.includes("error") ? errorMode : undefined}
         />
       }
       left={<WorkersPanel panels={view.panels} />}
       board={
         <ToolCursor tool={tool}>
-          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} pollArrows={step.id === 107} bubble={bubbleAt} />
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }
       overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
-      right={<OrdersPanel panels={view.panels} />}
+      right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} code={step.code} active={anchor} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
+      strip={idiom ? <HistoryStrip orderId={selected} replayedBy={replayer ? workerName(replayer.id) : undefined} /> : undefined}
       caption={<TryThis text={step.tryThis} />}
       banner={<BannerLine text={bannerText} />}
     />

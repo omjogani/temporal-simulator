@@ -1,12 +1,20 @@
 import { Parcel } from "@/components/atoms/Parcel";
-import { Wire } from "@/components/atoms/svg";
-import { VIEW, clientWire, sideWire, workerWire } from "@/lib/geometry";
+import { SvgText, Wire } from "@/components/atoms/svg";
+import { HUB, VIEW, clientWire, sideWire, workerWire } from "@/lib/geometry";
 import type { XY } from "@/lib/fx/effects";
 import type { PlacedDot } from "@/lib/motion/useDotMotion";
 import { SpeechBubble } from "@/components/molecules/SpeechBubble";
 import type { ArenaView, NodeId, Tone } from "@/lib/types";
 import { ClientNode, Hit, HubNode, SideNode, WorkerCard } from "./nodes";
+import art from "@/components/atoms/art.module.css";
 import styles from "./board.module.css";
+
+/** A poll runs from the worker up to the hub (the reverse of the order wire). */
+const pollPath = (worker: number) =>
+  [...workerWire(worker)]
+    .reverse()
+    .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join("");
 
 interface Props {
   view: ArenaView;
@@ -18,12 +26,14 @@ interface Props {
   /** Parcels are clickable (the current tool acts on a parcel). */
   parcelTool?: boolean;
   selected?: string | null;
+  /** Draw the workers' long polls to the hub (idiom scene 107, when the snapshot has queue data). */
+  pollArrows?: boolean;
   /** Reply to the presenter's last click on a parcel, in board units. */
   bubble?: { x: number; y: number; text: string; tone: Tone } | null;
 }
 
 /** The whole arena drawing: wires, nodes, worker cards, moving orders. */
-export function Board({ view, dots, onHit, onResume, shake, parcelTool, selected, bubble }: Props) {
+export function Board({ view, dots, onHit, onResume, shake, parcelTool, selected, pollArrows, bubble }: Props) {
   return (
     <svg className={styles.svg} viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} role="group" aria-label="Clients, hub and workers with orders moving between them">
       <g transform={shake && (shake.x || shake.y) ? `translate(${shake.x.toFixed(2)} ${shake.y.toFixed(2)})` : undefined}>
@@ -36,6 +46,24 @@ export function Board({ view, dots, onHit, onResume, shake, parcelTool, selected
         ))}
         {view.side && <Wire pts={sideWire()} moving={view.hub.up} />}
       </g>
+
+      {pollArrows && view.queue && (
+        <g pointerEvents="none">
+          <SvgText x={HUB.x + HUB.w / 2 + 16} y={HUB.y + 6} size={34} weight={800} tone={view.queue.backlog > 0 ? "gold" : "dim"}>
+            {String(view.queue.backlog)}
+          </SvgText>
+          <SvgText x={HUB.x + HUB.w / 2 + 16} y={HUB.y + 24} size={10} tone="dim" letterSpacing={1}>
+            WAITING
+          </SvgText>
+        </g>
+      )}
+      {pollArrows && view.queue && (
+        <g fill="none" strokeLinecap="round" pointerEvents="none">
+          {view.queue.pollers.map((id) => (
+            <path key={id} d={pollPath(id)} strokeWidth={3} strokeDasharray="7 9" className={art.poll} style={{ stroke: "var(--c-ok)" }} />
+          ))}
+        </g>
+      )}
 
       {[0, 1, 2, 3].map((i) => (
         <ClientNode key={i} index={i} wide={view.hub.lanes} onHit={onHit} />

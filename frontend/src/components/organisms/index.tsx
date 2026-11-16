@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { Button, Kbd, UrlPill } from "@/components/atoms";
+import { Button, Kbd, Switch, UrlPill } from "@/components/atoms";
 import { SpeakerIcon, TOOL_ICONS } from "@/components/atoms/icons";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
 import { IDIOMS, neighbours, routeFor } from "@/lib/idioms";
 import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
-import type { ActionId, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
+import type { ActionId, ArenaView, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
 import styles from "./organisms.module.css";
 
 export { Board } from "./board/Board";
+export { CodePanel } from "./CodePanel";
+export { HistoryStrip } from "./HistoryStrip";
 
 /** Left scoreboard: one row per worker (orders completed), plus the step's one extra fact. */
 export function WorkersPanel({ panels }: { panels: PanelsView }) {
@@ -66,11 +68,14 @@ interface ToolboxProps {
   /** Sound effects: muted by default; M toggles. */
   muted: boolean;
   onSound: () => void;
+  /** Scene switch state (idiom scenes) and the click handler that sends it to the controller. */
+  scene?: ArenaView["scene"];
+  onSwitch?: (s: { idemKey?: boolean; build?: "good" | "bad" }) => void;
   /** Sub-mode of the error tool, shown on its tile. */
   errorMode?: string;
 }
 
-const payActive = (a: ActionId, p: PaymentsView) => (a === "payDown" && p.state === "down") || (a === "paySlow" && p.state === "slow");
+const payActive = (a: ActionId, p: PaymentsView) => ((a === "payDown" || a === "payDownLong") && p.state === "down") || (a === "paySlow" && p.state === "slow");
 
 /** Fault buttons show their own countdown while active (there is no Payments box on the board). */
 const actionLabel = (a: ActionId, p: PaymentsView) =>
@@ -81,7 +86,7 @@ function ToolIcon({ tool }: { tool: ToolId }) {
   return <Icon size={20} />;
 }
 
-export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, errorMode }: ToolboxProps) {
+export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, scene, onSwitch, errorMode }: ToolboxProps) {
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
       {step.tools.map((t) => (
@@ -104,6 +109,12 @@ export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction,
         ) : (
           <ToolButton key={a} label={actionLabel(a, payments)} hotkey={ACTION_META[a].key} pressed={payActive(a, payments)} onClick={() => onAction(a)} />
         ),
+      )}
+      {step.switches?.includes("idemKey") && scene && onSwitch && (
+        <Switch label="Idempotency key" on={scene.idemKey} onLabel="Idempotency key ON" offLabel="Idempotency key OFF" onChange={(v) => onSwitch({ idemKey: v })} />
+      )}
+      {step.switches?.includes("build") && scene && onSwitch && (
+        <Switch label="Deployed build" on={scene.build === "good"} onLabel="workflow.Now() ✓" offLabel="time.Now() ✗" onChange={(v) => onSwitch({ build: v ? "good" : "bad" })} />
       )}
       {!step.live && (
         <Button onClick={onFreeze}>

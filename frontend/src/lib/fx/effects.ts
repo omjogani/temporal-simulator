@@ -58,13 +58,17 @@ export function anchor(ev: FxEvent, placed: PlacedDot[]): XY | null {
 }
 
 /** Where a click on a board node shows its tap ring. */
-export function nodeAnchor(node: NodeId): XY | null {
+export function nodeAnchor(node: NodeId, placed: PlacedDot[] = []): XY | null {
   if (node === "hub") return HUB_XY;
   if (node === "side") return { x: SIDE.x, y: SIDE.y };
   if (node.startsWith("w:")) return workerXY(Number(node.slice(2)));
   if (node.startsWith("c:")) {
     const c = CLIENTS[Number(node.slice(2))];
     return c ? { x: c.x, y: c.y } : null;
+  }
+  if (node.startsWith("o:")) {
+    const p = placed.find((d) => d.dot.id === node.slice(2));
+    return p ? { x: p.x, y: p.y } : null;
   }
   return null;
 }

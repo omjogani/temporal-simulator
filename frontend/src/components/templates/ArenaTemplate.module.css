@@ -83,3 +83,22 @@
     margin-left: 0;
   }
 }
+
+/* Under the board: spans the middle column on the next grid row. */
+.strip {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 1080px) {
+  .strip {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+}
+@media (max-width: 640px) {
+  .strip {
+    grid-column: 1;
+  }
+}
