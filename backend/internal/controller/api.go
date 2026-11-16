@@ -39,6 +39,17 @@ func (c *Controller) routes() http.Handler {
 		c.SetScene(b.IdemKey, b.Build)
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /api/order", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			ID  string `json:"id"`
+			Op  string `json:"op"`
+			Arg string `json:"arg"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		writeJSON(w, c.OrderOp(r.Context(), b.ID, b.Op, b.Arg))
+	})
 	mux.HandleFunc("GET /internal/deploy", func(w http.ResponseWriter, _ *http.Request) {
 		c.mu.Lock()
 		build := c.build

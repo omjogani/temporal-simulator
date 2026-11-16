@@ -157,6 +157,11 @@ func (c *Controller) applyExecution(id string, status enumspb.WorkflowExecutionS
 			o.ensureCompensation()
 			o.Steps[orders.CompensationStep].State = stDone
 		}
+		o.GiftWrap = p.GiftWrap
+		o.Address = p.Address
+		o.WaitUntil = p.WaitUntil
+		o.Express = p.Express
+		o.Timeout = p.GaveUp
 		if p.Paused && (o.Status == osQueued || o.Status == osFinishing) {
 			o.Status = osPaused
 			o.PauseRequested = false
@@ -183,7 +188,12 @@ func (c *Controller) applyExecution(id string, status enumspb.WorkflowExecutionS
 		o.EndedAt = unixMs(now)
 		o.Worker = -1
 		c.stats.Failed++
-	case enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED, enumspb.WORKFLOW_EXECUTION_STATUS_TIMED_OUT, enumspb.WORKFLOW_EXECUTION_STATUS_CANCELED:
+	case enumspb.WORKFLOW_EXECUTION_STATUS_CANCELED:
+		o.Status = osCanceled
+		o.EndedAt = unixMs(now)
+		o.Worker = -1
+		c.stats.Canceled++
+	case enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED, enumspb.WORKFLOW_EXECUTION_STATUS_TIMED_OUT:
 		o.Status = osLost
 		o.EndedAt = unixMs(now)
 		c.stats.Lost++

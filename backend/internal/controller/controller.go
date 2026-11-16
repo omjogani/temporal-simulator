@@ -215,7 +215,9 @@ func (c *Controller) SetScene(idemKey *bool, build *string) {
 		c.idemKey = *idemKey
 	}
 	deploy := false
-	if build != nil && (*build == "good" || *build == "bad") && *build != c.build {
+	if build != nil && *build == "bad" && c.step.ID != 105 {
+		c.say("The bad build can only be deployed in the deploy scene.")
+	} else if build != nil && (*build == "good" || *build == "bad") && *build != c.build {
 		c.build = *build
 		deploy = true
 		c.say("Deploying the %s build: restarting all 4 worker containers.", c.build)
