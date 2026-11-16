@@ -161,7 +161,9 @@ func (c *Controller) applyExecution(id string, status enumspb.WorkflowExecutionS
 		o.Address = p.Address
 		o.WaitUntil = p.WaitUntil
 		o.Express = p.Express
-		o.Timeout = p.GaveUp
+		if p.GaveUp != "" { // otherwise describeOne owns Timeout; an empty memo must not blank its label
+			o.Timeout = p.GaveUp
+		}
 		if p.Paused && (o.Status == osQueued || o.Status == osFinishing) {
 			o.Status = osPaused
 			o.PauseRequested = false
