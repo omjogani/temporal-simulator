@@ -7,6 +7,7 @@ import (
 
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/client"
 
 	"github.com/omjogani/temporal-simulator/backend/internal/orders"
 )
@@ -57,7 +58,9 @@ func TestOrderOpTerminalOrder(t *testing.T) {
 
 func TestOpErrReply(t *testing.T) {
 	want := OpReply{false, "Temporal unreachable, try again", "gold"}
-	for _, err := range []error{context.DeadlineExceeded, serviceerror.NewUnavailable("down"), fmt.Errorf("wrapped: %w", context.DeadlineExceeded)} {
+	for _, err := range []error{context.DeadlineExceeded, serviceerror.NewUnavailable("down"), serviceerror.NewDeadlineExceeded("x"),
+		client.NewWorkflowUpdateServiceTimeoutOrCanceledError(serviceerror.NewDeadlineExceeded("x")),
+		fmt.Errorf("wrapped: %w", context.DeadlineExceeded)} {
 		if got := opErrReply(err); got != want {
 			t.Fatalf("opErrReply(%v) = %+v", err, got)
 		}
@@ -73,5 +76,11 @@ func TestSetSceneRefusesBadBuildOutsideStep105(t *testing.T) {
 	c.SetScene(nil, &bad)
 	if c.build != "good" {
 		t.Fatalf("build = %q, want good", c.build)
+	}
+}
+
+func TestBadBuildAllowedOnlyOnStep105(t *testing.T) {
+	if badBuildAllowed(104) || !badBuildAllowed(105) {
+		t.Fatal("bad build must be deployable only on step 105")
 	}
 }

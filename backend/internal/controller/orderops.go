@@ -27,7 +27,8 @@ const opTimeout = 3 * time.Second
 // gold ("try again"), anything else is the error text in bad.
 func opErrReply(err error) OpReply {
 	var unavailable *serviceerror.Unavailable
-	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &unavailable) {
+	var deadline *serviceerror.DeadlineExceeded // what the SDK's gRPC interceptor returns when the 3 s context expires
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &unavailable) || errors.As(err, &deadline) {
 		return OpReply{false, "Temporal unreachable, try again", "gold"}
 	}
 	return OpReply{false, "✗ " + errMessage(err), "bad"}
