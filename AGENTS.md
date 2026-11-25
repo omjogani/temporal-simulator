@@ -14,7 +14,7 @@ The talk has two acts, one URL per step:
 | Route | Act | Topic | Backed by |
 |---|---|---|---|
 | `/` | | Scenario menu: one cartridge per step | |
-| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost | In-browser illustration |
+| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost; Payments faults, ack-after-processing duplicates, bulk job starving a VIP, pause-all | In-browser illustration |
 | `/2` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
 | `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
@@ -78,6 +78,15 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 - The controller hosts a fake Payments API with fault switches (down = 500s, slow = 5 s,
   declined card = 402 non-retryable). It dedups by idempotency key (the workflow ID).
 - The browser gets one state snapshot about 10 times a second over `ws://localhost:18080/ws`.
+
+## How step 1 works
+
+- `frontend/src/lib/sim/engine.ts` (`QueueSim`) is a seeded, clock-free simulation; tests tick it
+  (`engine.test.ts`). It is the counterpart to steps 2-5 so the presenter can flip between them:
+  Payments down/slow/declined (step 3), ack-after-processing with redelivery and a Dup counter
+  (step 2), a bulk job that starves the VIP client in FIFO (step 4), and pause-all, which can only
+  stop the consumers and drops or strands their orders (step 5).
+- Act 1 starts playing on load and on Reset. `tryThis` can be a list of numbered beats.
 
 ## How the idioms scenes work
 
@@ -152,7 +161,7 @@ cd frontend && pnpm test && pnpm lint && pnpm build
   (impacts, confetti, coins, sparks, dust) are drawn by one PixiJS canvas over the board
   (`FxCanvas`). Effects come from diffing consecutive `ArenaView`s (`src/lib/fx/events.ts`),
   never from extra backend fields. Keys: ← → steps, `Esc` menu, `H` `P` tools, `F` `A` `Z` `S`
-  `D` actions, `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
+  `D` actions, `K` ack mode and `B` bulk job (step 1 only), `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
   In idioms scenes: `1`-`8` jump to a scene, tools `V` select, `H` hammer, `E` error, `G` signal,
   `Q` query, `U` update, `X` cancel, `C` freeze, and `L` payments down 20 s.
 - **Presentation-first UI:** the screen is projected during a talk. Keep side panels minimal,
