@@ -12,6 +12,16 @@ export function runFor(sim: QueueSim, ms: number, step = 16) {
   for (let t = 0; t < ms; t += step) sim.tick(step);
 }
 
+/** Run until some banner matches `re` (banners are overwritten, so the final one is not the one to assert on). */
+export function runUntilBanner(sim: QueueSim, re: RegExp, ms: number, step = 16): string | null {
+  for (let t = 0; t < ms; t += step) {
+    sim.tick(step);
+    const text = sim.view().banner.text;
+    if (re.test(text)) return text;
+  }
+  return null;
+}
+
 function score(sim: QueueSim, key: ScoreKey) {
   return sim.view().panels.score.find((s) => s.key === key)?.value ?? 0;
 }
@@ -43,11 +53,11 @@ describe("payments faults", () => {
     const sim = newSim();
     sim.payments("declined");
     sim.flood();
+    expect(runUntilBanner(sim, /declined/i, 60_000)).not.toBeNull();
     runFor(sim, 60_000);
     expect(score(sim, "failed")).toBe(1);
     expect(score(sim, "lost")).toBe(1);
     expect(score(sim, "done")).toBe(29);
-    expect(sim.view().banner.text).toMatch(/declined/i);
   });
 
   test("payments slow stretches Charge to 5 s but orders still complete", () => {
@@ -92,9 +102,9 @@ describe("ack mode", () => {
     sim.toggleAckMode();
     busy(sim);
     sim.hit("w:1", "hammer");
+    expect(runUntilBanner(sim, /charged twice/i, 60_000)).not.toBeNull();
     runFor(sim, 60_000);
     expect(score(sim, "dup")).toBe(1);
-    expect(sim.view().banner.text).toMatch(/twice/i);
   });
 
   test("the Dup counter only appears in ack-after mode", () => {
@@ -113,5 +123,38 @@ describe("ack mode", () => {
     sim.hit("w:1", "hammer");
     sim.hit("hub", "hammer");
     expect(score(sim, "lost")).toBe(27);
+  });
+});
+
+describe("bulk job", () => {
+  const hubDots = (sim: QueueSim) => sim.view().dots.filter((d) => d.loc.kind === "hub").length;
+
+  test("bulkJob enqueues 40 orders at once", () => {
+    const sim = newSim();
+    sim.bulkJob();
+    expect(hubDots(sim)).toBe(40);
+  });
+
+  test("orders from client 1 carry the VIP tag", () => {
+    const sim = newSim();
+    sim.flood();
+    const vip = sim.view().dots.filter((d) => d.client === 0);
+    expect(vip.length).toBeGreaterThan(0);
+    expect(vip.every((d) => d.tag === "VIP")).toBe(true);
+    expect(sim.view().dots.filter((d) => d.client !== 0).some((d) => d.tag)).toBe(false);
+  });
+
+  test("a VIP order queued behind the bulk job waits and the banner says how long", () => {
+    const sim = newSim();
+    sim.bulkJob();
+    sim.flood();
+    let seen = "";
+    for (let t = 0; t < 120_000 && !seen; t += 16) {
+      sim.tick(16);
+      const text = sim.view().banner.text;
+      if (/VIP order #\d+ waited \d+ s/.test(text)) seen = text;
+    }
+    expect(seen).not.toBe("");
+    expect(Number(/waited (\d+) s/.exec(seen)![1])).toBeGreaterThanOrEqual(5);
   });
 });

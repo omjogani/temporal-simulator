@@ -11,6 +11,9 @@ const EVERY: [number, number] = [2600, 3800];
 const CHARGE = 1;
 const PAY_MS = 10_000;
 const SLOW_MS = 5_000;
+/** Client 1 is the VIP: its orders are tagged, but a plain queue still serves them in arrival order. */
+const VIP = 0;
+const BULK = 3;
 
 type OState = "queued" | "fetching" | "running" | "done" | "lost";
 
@@ -29,6 +32,7 @@ interface SimOrder {
   slow: boolean;
   /** Charged on an earlier delivery: a redelivery charges the card again. */
   chargedBefore: boolean;
+  queuedAt: number;
 }
 
 interface SimWorker {
@@ -99,6 +103,7 @@ export class QueueSim {
       chargeTried: false,
       slow: false,
       chargedBefore: false,
+      queuedAt: this.now,
     };
     this.orders.push(o);
     if (this.now < this.hubDown) {
@@ -189,6 +194,8 @@ export class QueueSim {
       for (const w of this.workers) {
         if (w.downUntil <= now && !w.order && this.queue.length) {
           const o = this.queue.shift()!;
+          const waited = Math.round((now - o.queuedAt) / 1000);
+          if (o.client === VIP && waited >= 5) this.say(`VIP order #${o.num} waited ${waited} s behind the bulk job. A plain queue is first in, first out.`);
           w.order = o;
           o.worker = w.id;
           o.state = "fetching";
@@ -284,6 +291,15 @@ export class QueueSim {
     this.say("30 orders incoming.");
   }
 
+  private tag(o: SimOrder) {
+    return o.client === VIP ? "VIP" : undefined;
+  }
+
+  bulkJob() {
+    for (let i = 0; i < 40; i++) this.spawn(BULK);
+    this.say("A bulk job of 40 orders just landed in the queue.");
+  }
+
   view(): ArenaView {
     const now = this.now;
     const cfg = this.cfg;
@@ -321,10 +337,10 @@ export class QueueSim {
     });
 
     const dots: DotView[] = [];
-    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: "none", hidden: i >= HUB_IN.cells }));
+    this.queue.forEach((o, i) => dots.push({ id: o.id, client: o.client, loc: { kind: "hub", slot: i }, ring: "none", hidden: i >= HUB_IN.cells, tag: this.tag(o) }));
     for (const o of this.orders) {
       if (o.state === "fetching" || o.state === "running")
-        dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.charged ? "charged" : "none" });
+        dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.charged ? "charged" : "none", tag: this.tag(o) });
       else if (o.state === "done")
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: "done", fate: "done" });
       else if (o.state === "lost") dots.push({ id: o.id, client: o.client, loc: { kind: "gone" }, ring: "none", fate: "lost" });

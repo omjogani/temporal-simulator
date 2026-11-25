@@ -153,6 +153,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       else if (a === "paySlow") sim?.payments("slow");
       else if (a === "declined") sim?.payments("declined");
       else if (a === "ackMode") sim?.toggleAckMode();
+      else if (a === "bulkJob") sim?.bulkJob();
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);
@@ -221,6 +222,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
       else if (k === "k" && has("ackMode")) action("ackMode");
+      else if (k === "b" && has("bulkJob")) action("bulkJob");
       else if (k === "k" && idiom && step.code) toggleCodeOpen();
       else if (k === "r") action("reset");
       else if (k === "m") sound.toggle();

@@ -14,6 +14,7 @@ export type ActionId =
   | "payDownLong"
   | "pauseAll"
   | "ackMode"
+  | "bulkJob"
   | "resumeAll"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
