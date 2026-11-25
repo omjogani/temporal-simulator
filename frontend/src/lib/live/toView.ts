@@ -24,7 +24,7 @@ const TIMEOUT_TAG = {
   Heartbeat: "heartbeat ⏱",
   ScheduleToClose: "schedule-to-close ⏱",
 } as const;
-const LANE_LABELS = ["C1 VIP", "C2", "C3", "C4 bulk"];
+const LANE_LABELS = ["C1 VIP", "C2 VIP", "C3", "C4"];
 
 /** Share of a running activity done, 0..1. Clamped: the browser's estimate of server time can lag `startedAt`. */
 export function stepProgress(now: number, startedAt: number | undefined, durationMs: number | undefined): number {
