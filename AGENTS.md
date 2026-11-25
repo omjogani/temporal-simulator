@@ -14,7 +14,7 @@ The talk has two acts, one URL per step:
 | Route | Act | Topic | Backed by |
 |---|---|---|---|
 | `/` | | Scenario menu: one cartridge per step | |
-| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost; Payments faults, ack-after-processing duplicates, bulk job starving a VIP, pause-all | In-browser illustration |
+| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost; Payments faults, ack-after-processing duplicates, bulk job blocking FIFO, pause-all | In-browser illustration |
 | `/2` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
 | `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
@@ -84,7 +84,7 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 - `frontend/src/lib/sim/engine.ts` (`QueueSim`) is a seeded, clock-free simulation; tests tick it
   (`engine.test.ts`). It is the counterpart to steps 2-5 so the presenter can flip between them:
   Payments down/slow/declined (step 3), ack-after-processing with redelivery and a Dup counter
-  (step 2), a bulk job that starves the VIP client in FIFO (step 4), and pause-all, which can only
+  (step 2), a bulk job that makes every other order wait in FIFO (step 4), and pause-all, which can only
   stop the consumers and drops or strands their orders (step 5).
 - Act 1 starts playing on load and on Reset. `tryThis` can be a list of numbered beats.
 

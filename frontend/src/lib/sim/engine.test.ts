@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { QueueSim } from "./engine";
+import { getStep, tryThisLines } from "../steps";
 import type { ScoreKey } from "../types";
 
 const SCORE: ScoreKey[] = ["done", "inflight", "lost", "failed"];
@@ -134,29 +135,6 @@ describe("bulk job", () => {
     sim.bulkJob();
     expect(hubDots(sim)).toBe(40);
   });
-
-  test("orders from client 1 carry the VIP tag", () => {
-    const sim = newSim();
-    sim.flood();
-    const vip = sim.view().dots.filter((d) => d.client === 0);
-    expect(vip.length).toBeGreaterThan(0);
-    expect(vip.every((d) => d.tag === "VIP")).toBe(true);
-    expect(sim.view().dots.filter((d) => d.client !== 0).some((d) => d.tag)).toBe(false);
-  });
-
-  test("a VIP order queued behind the bulk job waits and the banner says how long", () => {
-    const sim = newSim();
-    sim.bulkJob();
-    sim.flood();
-    let seen = "";
-    for (let t = 0; t < 120_000 && !seen; t += 16) {
-      sim.tick(16);
-      const text = sim.view().banner.text;
-      if (/VIP order #\d+ waited \d+ s/.test(text)) seen = text;
-    }
-    expect(seen).not.toBe("");
-    expect(Number(/waited (\d+) s/.exec(seen)![1])).toBeGreaterThanOrEqual(5);
-  });
 });
 
 describe("pause all", () => {
@@ -208,13 +186,6 @@ describe("pause all", () => {
 });
 
 describe("honest copy (final review fixes)", () => {
-  test("the VIP banner never blames a bulk job that did not happen", () => {
-    const sim = newSim();
-    sim.flood();
-    sim.setRunning(true);
-    expect(runUntilBanner(sim, /bulk job/i, 180_000)).toBeNull();
-  });
-
   test("the Failed counter is red and not called clean in step 1", () => {
     const sim = newSim();
     sim.payments("declined");
@@ -234,5 +205,22 @@ describe("honest copy (final review fixes)", () => {
     expect(text).not.toBeNull();
     expect(text).not.toMatch(/already deleted/i);
     expect(text).toMatch(/worker dropped/i);
+  });
+});
+
+describe("step 1 does not reveal the VIP idea (that is step 4)", () => {
+  test("no VIP tag, banner or caption anywhere in the plain queue", () => {
+    const sim = newSim();
+    sim.bulkJob();
+    sim.flood();
+    sim.setRunning(true);
+    const seen: string[] = [];
+    for (let t = 0; t < 120_000; t += 16) {
+      sim.tick(16);
+      const v = sim.view();
+      seen.push(v.banner.text, ...v.dots.map((d) => d.tag ?? ""));
+    }
+    expect(seen.some((x) => /vip/i.test(x))).toBe(false);
+    expect(tryThisLines(getStep(1)!).some((l) => /vip/i.test(l))).toBe(false);
   });
 });

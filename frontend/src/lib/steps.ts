@@ -44,7 +44,7 @@ export const STEPS: StepConfig[] = [
       "Hammer a worker, then the queue: orders were deleted at hand-out.",
       "Ack after processing: no loss, but a crash charges the card twice.",
       "Payments down or declined: orders vanish, nothing retries or refunds.",
-      "Drop a Bulk job: the VIP order waits behind all 40.",
+      "Drop a Bulk job: every other order waits behind all 40.",
       "Pause all: a queue can't pause mid-order, so the work is dropped.",
     ],
   },
