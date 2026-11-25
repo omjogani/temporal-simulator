@@ -295,6 +295,25 @@ export class QueueSim {
     return o.client === VIP ? "VIP" : undefined;
   }
 
+  /** A plain queue cannot pause an order mid-flight: the only way to stop work is to stop the consumers. */
+  pauseAll() {
+    let held = 0;
+    for (const w of this.workers) {
+      w.downUntil = Infinity;
+      const o = w.order;
+      w.order = null;
+      if (!o) continue;
+      held++;
+      if (this.ackMode === "after") this.redeliver(o);
+      else this.lose(o);
+    }
+    this.say(
+      this.ackMode === "after"
+        ? `A queue can't pause an order mid-flight: stopping the workers sent ${held} back to the queue. Nothing resumes them.`
+        : `A queue can't pause an order mid-flight: stopping the workers dropped ${held} of them. The rest sit in the queue and nothing resumes them.`,
+    );
+  }
+
   bulkJob() {
     for (let i = 0; i < 40; i++) this.spawn(BULK);
     this.say("A bulk job of 40 orders just landed in the queue.");
@@ -314,7 +333,11 @@ export class QueueSim {
       });
       let status = "idle";
       let statusTone: WorkerCardView["statusTone"] = "dim";
-      if (down) {
+      const stopped = w.downUntil === Infinity;
+      if (stopped) {
+        status = "STOPPED";
+        statusTone = "bad";
+      } else if (down) {
         status = `DOWN · ${Math.ceil((w.downUntil - now) / 1000)}s`;
         statusTone = "bad";
       } else if (o?.state === "fetching") status = "fetching";
@@ -325,7 +348,7 @@ export class QueueSim {
       return {
         id: w.id,
         up: !down,
-        downLeftMs: Math.max(0, w.downUntil - now),
+        downLeftMs: stopped ? HAMMER_MS : Math.max(0, w.downUntil - now),
         status,
         statusTone,
         orderLabel: o ? `Order #${o.num}` : undefined,
@@ -371,7 +394,7 @@ export class QueueSim {
       panels: {
         workers: this.workers.map((w) => {
           const down = now < w.downUntil;
-          return { id: w.id, up: !down, note: down ? `down · ${Math.ceil((w.downUntil - now) / 1000)}s` : w.order ? "busy" : "idle", noteTone: down ? "bad" : "dim", completed: w.completed };
+          return { id: w.id, up: !down, note: w.downUntil === Infinity ? "stopped" : down ? `down · ${Math.ceil((w.downUntil - now) / 1000)}s` : w.order ? "busy" : "idle", noteTone: down ? "bad" : "dim", completed: w.completed };
         }),
         service: { label: "Queue", up: !hubDown, note: hubDown ? `${Math.ceil((this.hubDown - now) / 1000)}s` : "●" },
         score,

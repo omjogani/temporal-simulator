@@ -154,6 +154,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       else if (a === "declined") sim?.payments("declined");
       else if (a === "ackMode") sim?.toggleAckMode();
       else if (a === "bulkJob") sim?.bulkJob();
+      else if (a === "pauseAll") sim?.pauseAll();
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);

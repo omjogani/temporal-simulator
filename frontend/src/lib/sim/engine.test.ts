@@ -158,3 +158,51 @@ describe("bulk job", () => {
     expect(Number(/waited (\d+) s/.exec(seen)![1])).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe("pause all", () => {
+  const hubDots = (sim: QueueSim) => sim.view().dots.filter((d) => d.loc.kind === "hub").length;
+  const onWorkers = (sim: QueueSim) => sim.view().dots.filter((d) => d.loc.kind === "worker" && !d.fate).length;
+
+  test("stopped workers take no more orders while the queue keeps growing", () => {
+    const sim = newSim();
+    sim.flood();
+    sim.pauseAll();
+    runFor(sim, 30_000);
+    expect(score(sim, "done")).toBe(0);
+    expect(hubDots(sim)).toBe(30);
+    sim.setRunning(true);
+    runFor(sim, 30_000);
+    expect(hubDots(sim)).toBeGreaterThan(30);
+    expect(sim.view().workers.every((w) => !w.up)).toBe(true);
+  });
+
+  test("auto-ack: stopping the workers drops every order they were holding", () => {
+    const sim = newSim();
+    sim.flood();
+    runFor(sim, 1500);
+    sim.pauseAll();
+    expect(score(sim, "lost")).toBe(4);
+    expect(sim.view().banner.text).toMatch(/can't pause/i);
+  });
+
+  test("ack-after: stopping the workers sends their orders back to the queue", () => {
+    const sim = newSim();
+    sim.toggleAckMode();
+    sim.flood();
+    runFor(sim, 1500);
+    sim.pauseAll();
+    expect(score(sim, "lost")).toBe(0);
+    expect(hubDots(sim)).toBe(30);
+  });
+
+  test("flood, bulk job and hammer after a pause do not throw and leave nothing running", () => {
+    const sim = newSim();
+    sim.pauseAll();
+    sim.flood();
+    sim.bulkJob();
+    sim.hit("w:1", "hammer");
+    sim.hit("hub", "hammer");
+    runFor(sim, 20_000);
+    expect(onWorkers(sim)).toBe(0);
+  });
+});
