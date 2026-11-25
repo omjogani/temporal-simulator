@@ -9,7 +9,7 @@ export interface CodeSnippet {
 }
 
 export interface StepConfig {
-  section: "steps" | "idioms";
+  section: "steps";
   rule?: string;
   code?: CodeSnippet;
   switches?: SwitchId[];
@@ -111,10 +111,21 @@ export const STEPS: StepConfig[] = [
 ];
 
 /** The step's accent colour as a CSS value. */
-export const stepAccent = (id: number): string => (id >= 100 ? "var(--c-idioms)" : `var(--c-step-${id})`);
+export const stepAccent = (id: number): string => `var(--c-step-${id})`;
 
 /** The caption as a list of lines: a plain string is a single line. */
 export const tryThisLines = (step: StepConfig): string[] => (Array.isArray(step.tryThis) ? step.tryThis : [step.tryThis]);
+
+export const routeFor = (cfg: StepConfig): string => `/${cfg.id}`;
+
+/** Routes of the previous and next step (← → keys). */
+export function neighbours(cfg: StepConfig): { prev?: string; next?: string } {
+  const i = STEPS.findIndex((s) => s.id === cfg.id);
+  return {
+    prev: i > 0 ? routeFor(STEPS[i - 1]) : undefined,
+    next: i >= 0 && i < STEPS.length - 1 ? routeFor(STEPS[i + 1]) : undefined,
+  };
+}
 
 export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
 

@@ -19,17 +19,8 @@ The talk has two acts, one URL per step:
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
 | `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
 | `/5` | Temporal | Pause and resume workflows | **Real Temporal** |
-| `/idioms` | Idioms | Section intro: eight scenes on the programming model | |
-| `/idioms/1` | Idioms | Workflow vs activity: workflows decide, activities do | **Real Temporal** |
-| `/idioms/2` | Idioms | Event history and replay (real replay events from workers) | **Real Temporal** |
-| `/idioms/3` | Idioms | Retryable (500) vs non-retryable (declined) errors, compensation | **Real Temporal** |
-| `/idioms/4` | Idioms | Idempotency key on/off: a retried charge after a kill | **Real Temporal** |
-| `/idioms/5` | Idioms | Determinism: deploy a `time.Now()` build, real non-determinism error | **Real Temporal** |
-| `/idioms/6` | Idioms | Timeouts: start-to-close, heartbeat (`docker pause`), schedule-to-close | **Real Temporal** |
-| `/idioms/7` | Idioms | Workers poll task queues: pollers and backlog from `DescribeTaskQueue` | **Real Temporal** |
-| `/idioms/8` | Idioms | Signal, query, update, cancel on a running order | **Real Temporal** |
 
-Rule: anything shown in Act 2 or the Idioms section must be real Temporal behaviour, not simulated. Act 1 is allowed
+Rule: anything shown in Act 2 must be real Temporal behaviour, not simulated. Act 1 is allowed
 to be a pure illustration.
 
 Design prototype (single HTML page that the app is built from):
@@ -44,15 +35,13 @@ temporal/dynamicconfig.yaml  priority + fairness switches for the server
 backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
-  internal/steps/         per-step config for the live steps (2-5) and idiom scenes (101-108)
+  internal/steps/         per-step config for the live steps (2-5) and the older idiom scenes (101-108, backend only)
   internal/controller/    HTTP + WebSocket API, worker container manager, docker hammer,
                           fake Payments API, client load generator, state registry
 frontend/                 Next.js (App Router, TypeScript), atomic design
   src/components/atoms|molecules|organisms|templates
   src/app/[step]/         one route per step
-  src/app/idioms/[scene]/ one route per idiom scene (1-8); `src/app/idioms/` is the section intro
   src/lib/                step configs, board geometry, Act 1 simulation, live adapter;
-                          `idioms.ts` holds scene configs (rule, tools, switches, code, tryThis)
   src/lib/fx/             effects from diffing ArenaViews (events, effects, particles), sound
   src/lib/pets.ts         the four worker pets and their poses
 ```
@@ -88,7 +77,10 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
   stop the consumers and drops or strands their orders (step 5).
 - Act 1 starts playing on load and on Reset. `tryThis` can be a list of numbered beats.
 
-## How the idioms scenes work
+## Idioms backend (no frontend)
+
+The `/idioms` pages were removed from the frontend; the controller still serves the scene
+support below, unused by the UI. Remove it too if it gets in the way.
 
 - Scenes run as controller steps 101-108 (`/idioms/N` sets step `100+N`) on the same
   `OrderWorkflow`, extended with a `giftWrap` signal, a `changeAddress` update (validator
@@ -162,8 +154,8 @@ cd frontend && pnpm test && pnpm lint && pnpm build
   (`FxCanvas`). Effects come from diffing consecutive `ArenaView`s (`src/lib/fx/events.ts`),
   never from extra backend fields. Keys: ← → steps, `Esc` menu, `H` `P` tools, `F` `A` `Z` `S`
   `D` actions, `K` ack mode and `B` bulk job (step 1 only), `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
-  In idioms scenes: `1`-`8` jump to a scene, tools `V` select, `H` hammer, `E` error, `G` signal,
-  `Q` query, `U` update, `X` cancel, `C` freeze, and `L` payments down 20 s.
+  Other tools and actions: `V` select, `E` error, `G` signal, `Q` query, `U` update, `X` cancel,
+  `C` freeze, and `L` payments down 20 s.
 - **Presentation-first UI:** the screen is projected during a talk. Keep side panels minimal,
   numbers large, colours meaningful (gold = charged / retrying, red = lost / duplicate,
   green = done). Don't add dense debug info to the main view.

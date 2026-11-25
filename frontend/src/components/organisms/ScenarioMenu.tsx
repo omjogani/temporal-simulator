@@ -24,7 +24,7 @@ function Cartridge({ step }: { step: StepConfig }) {
   const accent = stepAccent(step.id);
   const dark = `color-mix(in srgb, ${accent} 55%, #000)`;
   const lines = labelLines(step.name);
-  const sticker = step.section === "idioms" ? "REAL TEMPORAL · 8 SCENES" : `${step.id} · ${step.act === 1 ? "WITHOUT TEMPORAL" : "REAL TEMPORAL"}`;
+  const sticker = `${step.id} · ${step.act === 1 ? "WITHOUT TEMPORAL" : "REAL TEMPORAL"}`;
   return (
     <svg viewBox="0 0 220 250" width={220} height={250} aria-hidden>
       {/* side face for depth */}
@@ -119,7 +119,7 @@ export function ScenarioMenu({ steps, selected, onSelect, onStart }: Props) {
         ▶ Start <kbd>Enter</kbd>
       </button>
       <p className={styles.keys}>
-        <kbd>←</kbd> <kbd>→</kbd> choose · <kbd>1</kbd>–<kbd>5</kbd> jump in · <kbd>6</kbd> idioms · <kbd>Esc</kbd> in a scenario comes back here
+        <kbd>←</kbd> <kbd>→</kbd> choose · <kbd>1</kbd>–<kbd>5</kbd> jump in · <kbd>Esc</kbd> in a scenario comes back here
       </p>
     </main>
   );

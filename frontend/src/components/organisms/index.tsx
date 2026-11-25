@@ -2,8 +2,7 @@ import Link from "next/link";
 import { Button, Kbd, Switch, UrlPill } from "@/components/atoms";
 import { SpeakerIcon, TOOL_ICONS } from "@/components/atoms/icons";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
-import { IDIOMS, neighbours, routeFor } from "@/lib/idioms";
-import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, type StepConfig } from "@/lib/steps";
+import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, neighbours, routeFor, type StepConfig } from "@/lib/steps";
 import type { ActionId, ArenaView, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
 import styles from "./organisms.module.css";
 
@@ -132,15 +131,14 @@ export function Toolbox({ step, tool, sched, payments, ackAfter, frozen, onTool,
   );
 }
 
-/** Previous / next arrows around the URL pill, inside the step's own section (← → keys do the same). */
+/** Previous / next arrows around the URL pill, (← → keys do the same). */
 export function StepNav({ config }: { config: StepConfig }) {
-  const list = config.section === "idioms" ? IDIOMS : STEPS;
   const nav = neighbours(config);
-  const find = (href?: string) => list.find((s) => routeFor(s) === href);
+  const find = (href?: string) => STEPS.find((s) => routeFor(s) === href);
   const prev = find(nav.prev);
   const next = find(nav.next);
   return (
-    <nav className={styles.stepNav} aria-label={config.section === "idioms" ? "Idioms" : "Steps"}>
+    <nav className={styles.stepNav} aria-label="Steps">
       <Link href={nav.prev ?? "#"} className={styles.nav} aria-label={prev ? `Previous: ${prev.name}` : "Previous step"} title={prev?.name} aria-disabled={!prev}>
         ←
       </Link>

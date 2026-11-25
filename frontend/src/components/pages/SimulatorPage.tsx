@@ -4,18 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
-import { BannerLine, Board, CodeDrawer, CodePanel, ConnectionNotice, HistoryStrip, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
+import { BannerLine, Board, ConnectionNotice, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
 import { bubbleVisible, type Bubble } from "@/lib/bubble";
-import { activeAnchor } from "@/lib/code";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
-import { toggleCodeOpen } from "@/lib/codeOpen";
-import { IDIOMS, neighbours } from "@/lib/idioms";
-import { stepAccent, tryThisLines, workerName, type StepConfig } from "@/lib/steps";
+import { neighbours, stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
@@ -181,12 +178,6 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     else sim?.setRunning(!playing);
   };
 
-  // Idiom scenes: the code line the selected order is on, and which worker last replayed it.
-  const idiom = step.section === "idioms";
-  const selOrder = idiom && selected ? live.snapshot?.orders.find((o) => o.id === selected) : undefined;
-  const anchor = activeAnchor(selOrder, wall + live.offset, step.id);
-  const replayer = selOrder ? view.workers.find((w) => w.id === selOrder.worker && w.replayed) : undefined;
-
   // Keyboard: ← → steps, tool and action hotkeys, space to freeze (Act 1).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -202,7 +193,6 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       }
       else if (e.key === "ArrowRight" && nav.next) router.push(nav.next);
       else if (e.key === "ArrowLeft" && nav.prev) router.push(nav.prev);
-      else if (step.section === "idioms" && /^[1-8]$/.test(e.key) && IDIOMS[Number(e.key) - 1]) router.push(`/idioms/${e.key}`);
       else if (k === "e" && step.tools.includes("error")) {
         if (tool === "error") setErrorMode((m) => (m === "500" ? "declined" : "500"));
         else setTool("error");
@@ -230,7 +220,6 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       else if (k === "d" && has("declined")) action("declined");
       else if (k === "k" && has("ackMode")) action("ackMode");
       else if (k === "b" && has("bulkJob")) action("bulkJob");
-      else if (k === "k" && idiom && step.code) toggleCodeOpen();
       else if (k === "r") action("reset");
       else if (k === "m") sound.toggle();
       else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
@@ -286,18 +275,16 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       left={<WorkersPanel panels={view.panels} />}
       board={
         <ToolCursor tool={tool}>
-          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} pollArrows={step.id === 107} bubble={bubbleAt} />
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }
       overlay={
         <>
-          {idiom && step.code && <CodeDrawer code={step.code} active={anchor} />}
           {step.live && !view.connected && <ConnectionNotice />}
         </>
       }
-      right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
-      strip={idiom ? <HistoryStrip orderId={selected} replayedBy={replayer ? workerName(replayer.id) : undefined} replayedAt={replayer ? live.snapshot?.workers.find((w) => w.id === replayer.id)?.replayedAt : undefined} /> : undefined}
+      right={<OrdersPanel panels={view.panels} />}
       caption={<TryThis lines={tryThisLines(step)} />}
       banner={<BannerLine text={bannerText} />}
     />

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getStep, tryThisLines } from "./steps";
+import { getStep, neighbours, tryThisLines } from "./steps";
 import type { StepConfig } from "./steps";
 
 const step = (tryThis: StepConfig["tryThis"]) => ({ tryThis }) as StepConfig;
@@ -21,5 +21,13 @@ describe("tryThisLines", () => {
 
   test("live steps keep their single caption", () => {
     expect(tryThisLines(getStep(2)!)).toHaveLength(1);
+  });
+});
+
+describe("step navigation", () => {
+  test("neighbours link steps 1 to 5 in order and stop at the ends", () => {
+    expect(neighbours(getStep(1)!)).toEqual({ prev: undefined, next: "/2" });
+    expect(neighbours(getStep(3)!)).toEqual({ prev: "/2", next: "/4" });
+    expect(neighbours(getStep(5)!)).toEqual({ prev: "/4", next: undefined });
   });
 });
