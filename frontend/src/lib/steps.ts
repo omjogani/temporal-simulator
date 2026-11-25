@@ -37,8 +37,8 @@ export const STEPS: StepConfig[] = [
     side: null,
     lanes: false,
     tools: ["hammer"],
-    actions: ["flood"],
-    score: ["done", "inflight", "lost"],
+    actions: ["flood", "payDown", "paySlow", "declined"],
+    score: ["done", "inflight", "lost", "failed"],
     tryThis:
       "Hammer a busy worker. The queue deleted that order when it handed it out, so it dies halfway: stock reserved, card charged, never shipped. Then hammer the queue: every waiting order is gone, and new orders fail for 10 s.",
   },

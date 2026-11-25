@@ -149,6 +149,9 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     }
     if (!step.live) {
       if (a === "flood") sim?.flood();
+      else if (a === "payDown") sim?.payments("down");
+      else if (a === "paySlow") sim?.payments("slow");
+      else if (a === "declined") sim?.payments("declined");
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);

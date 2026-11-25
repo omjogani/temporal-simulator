@@ -95,7 +95,7 @@ export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => vo
   const interior = down ? 0.35 : hub.starting ? 0.7 : 1;
   return (
     <Hit node="hub" label={hub.label} onHit={onHit}>
-      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={down} highlight={hub.starting} roof={temporal ? "straight" : "crooked"} />
+      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={down} highlight={hub.starting} roof="straight" />
       <g opacity={interior}>
         <SvgText x={left + 14} y={top + 21} letterSpacing={1} weight={600}>
           {hub.label.toUpperCase()}

@@ -9,6 +9,8 @@ import type { ArenaView, ChecklistRowView, DotView, NodeId, ScoreItemView, Score
 const ACT_MS = 700;
 const EVERY: [number, number] = [2600, 3800];
 const CHARGE = 1;
+const PAY_MS = 10_000;
+const SLOW_MS = 5_000;
 
 type OState = "queued" | "fetching" | "running" | "done" | "lost";
 
@@ -23,6 +25,8 @@ interface SimOrder {
   t: number; // ms spent in the current state
   charged: boolean;
   endedAt: number;
+  chargeTried: boolean;
+  slow: boolean;
 }
 
 interface SimWorker {
@@ -59,7 +63,9 @@ export class QueueSim {
   /** Clients only place orders after the presenter presses Play. */
   running = false;
   private hubDown = 0;
-  private stats = { done: 0, lost: 0 };
+  private stats = { done: 0, lost: 0, failed: 0 };
+  private payFault: { mode: "down" | "slow"; until: number } | null = null;
+  private declineNext = false;
   private banner = { seq: 0, text: "" };
 
   constructor(cfg: SimConfig) {
@@ -86,6 +92,8 @@ export class QueueSim {
       t: 0,
       charged: false,
       endedAt: 0,
+      chargeTried: false,
+      slow: false,
     };
     this.orders.push(o);
     if (this.now < this.hubDown) {
@@ -100,6 +108,40 @@ export class QueueSim {
     o.state = "lost";
     o.endedAt = this.now;
     this.stats.lost++;
+  }
+
+  /** How long the order's current activity lasts: Charge stretches to 5 s while Payments is slow. */
+  private actMs(o: SimOrder) {
+    return o.cur === CHARGE && o.slow ? SLOW_MS : ACT_MS;
+  }
+
+  /** Payments is called when an order starts Charge; a plain queue has no retry or compensation. */
+  private tryCharge(o: SimOrder, w: SimWorker): boolean {
+    o.chargeTried = true;
+    const fault = this.payFault && this.now < this.payFault.until ? this.payFault.mode : null;
+    let why = "";
+    if (this.declineNext) {
+      this.declineNext = false;
+      why = "the card was declined";
+    } else if (fault === "down") why = "the Payments API is down";
+    else if (fault === "slow") o.slow = true;
+    if (!why) return false;
+    w.order = null;
+    this.stats.failed++;
+    this.lose(o);
+    this.say(`Order #${o.num} failed: ${why}. The queue already deleted it, so nothing retries it and nothing is refunded or released.`);
+    return true;
+  }
+
+  /** Start a Payments fault: down (500s) or slow (5 s calls) for 10 s, or decline the next card. */
+  payments(mode: "down" | "slow" | "declined") {
+    if (mode === "declined") {
+      this.declineNext = true;
+      this.say("The next card will be declined.");
+      return;
+    }
+    this.payFault = { mode, until: this.now + PAY_MS };
+    this.say(mode === "down" ? "Payments API is down for 10 s." : "Payments API is slow for 10 s: charges take 5 s.");
   }
 
   /**
@@ -139,8 +181,11 @@ export class QueueSim {
           break;
         case "running": {
           if (!w) break;
-          if (o.cur === CHARGE && o.t >= ACT_MS / 2) o.charged = true;
-          if (o.t >= ACT_MS) {
+          if (o.cur === CHARGE && !o.chargeTried) {
+            if (this.tryCharge(o, w)) break;
+          }
+          if (o.cur === CHARGE && o.t >= this.actMs(o) / 2) o.charged = true;
+          if (o.t >= this.actMs(o)) {
             o.done[o.cur] = true;
             o.cur++;
             o.t = 0;
@@ -210,7 +255,7 @@ export class QueueSim {
       const rows: ChecklistRowView[] = STEP_NAMES.map((label, i) => {
         if (!o) return { label, state: "placeholder" };
         if (o.done[i]) return { label, state: "done" };
-        if (i === o.cur && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / ACT_MS) };
+        if (i === o.cur && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / this.actMs(o)) };
         return { label, state: "pending" };
       });
       let status = "idle";
@@ -248,7 +293,7 @@ export class QueueSim {
     }
 
     const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: 0, paused: 0, canceled: 0 };
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: this.stats.failed, paused: 0, canceled: 0 };
     const score: ScoreItemView[] = cfg.score.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
 
     const hubDown = now < this.hubDown;
@@ -263,7 +308,8 @@ export class QueueSim {
         lanes: false,
         store: "memory",
       },
-      payments: { state: "ok", leftMs: 0 },
+      payments:
+        this.payFault && now < this.payFault.until ? { state: this.payFault.mode, leftMs: this.payFault.until - now } : { state: "ok", leftMs: 0 },
       side: null,
       workers,
       dots,
