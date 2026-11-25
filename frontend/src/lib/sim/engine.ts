@@ -13,7 +13,7 @@ const PAY_MS = 10_000;
 const SLOW_MS = 5_000;
 const BULK = 3;
 
-type OState = "queued" | "fetching" | "running" | "done" | "lost";
+type OState = "queued" | "fetching" | "running" | "done" | "lost" | "parked";
 
 interface SimOrder {
   id: string;
@@ -69,6 +69,9 @@ export class QueueSim {
   private stats = { done: 0, lost: 0, failed: 0, dup: 0 };
   private payFault: { mode: "down" | "slow"; until: number } | null = null;
   private declineNext = false;
+  private dlqOn = false;
+  /** Orders the queue gave up on and parked. A separate queue, so a crash of the main one does not touch it. */
+  private dlq: SimOrder[] = [];
   /** "auto": the queue deletes an order when it hands it out. "after": it only deletes after the worker finishes, so crashes redeliver. */
   ackMode: "auto" | "after" = "auto";
   private banner = { seq: 0, text: "" };
@@ -134,6 +137,12 @@ export class QueueSim {
     if (!why) return false;
     w.order = null;
     this.stats.failed++;
+    if (this.dlqOn) {
+      o.state = "parked";
+      this.dlq.push(o);
+      this.say(`Order #${o.num} failed: ${why}. The queue parked it in the dead-letter queue: the data is safe, but nothing retries it, refunds it or releases its stock until someone looks.`);
+      return true;
+    }
     this.lose(o);
     this.say(
       this.ackMode === "after"
@@ -163,6 +172,37 @@ export class QueueSim {
     o.chargeTried = false;
     o.slow = false;
     this.queue.unshift(o);
+  }
+
+  toggleDlq() {
+    this.dlqOn = !this.dlqOn;
+    this.say(this.dlqOn ? "Dead-letter queue on: orders the queue can't process are parked instead of dropped." : "Dead-letter queue off: failed orders are dropped.");
+  }
+
+  /** A person replays one parked order: it goes to the back of the queue and starts again from the first step. */
+  replay(id: string) {
+    const i = this.dlq.findIndex((o) => o.id === id);
+    if (i < 0) return;
+    const [o] = this.dlq.splice(i, 1);
+    if (this.now < this.hubDown) {
+      this.lose(o);
+      this.say(`Order #${o.num} can't be replayed: the queue is down.`);
+      return;
+    }
+    o.state = "queued";
+    o.worker = 0;
+    o.done = [false, false, false, false];
+    o.cur = 0;
+    o.t = 0;
+    o.charged = false;
+    o.chargeTried = false;
+    o.slow = false;
+    this.queue.push(o);
+    this.say(`Replaying order #${o.num} from the start: Reserve stock runs again, and the first reservation was never released.`);
+  }
+
+  replayAll() {
+    for (const o of [...this.dlq]) this.replay(o.id);
   }
 
   /** Start a Payments fault: down (500s) or slow (5 s calls) for 10 s, or decline the next card. */
@@ -360,12 +400,15 @@ export class QueueSim {
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.charged ? "charged" : "none" });
       else if (o.state === "done")
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: "done", fate: "done" });
+      else if (o.state === "parked") dots.push({ id: o.id, client: o.client, loc: { kind: "side", slot: this.dlq.indexOf(o) }, ring: "failed", hidden: true });
       else if (o.state === "lost") dots.push({ id: o.id, client: o.client, loc: { kind: "gone" }, ring: "none", fate: "lost" });
     }
 
-    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, failed: this.stats.failed, paused: 0, canceled: 0 };
-    const keys: ScoreKey[] = this.ackMode === "after" && !cfg.score.includes("dup") ? [...cfg.score.slice(0, 3), "dup", ...cfg.score.slice(3)] : cfg.score;
+    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost" && o.state !== "parked").length;
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, failed: this.stats.failed, dlq: this.dlq.length, paused: 0, canceled: 0 };
+    const keys: ScoreKey[] = [...cfg.score];
+    if (this.dlqOn || this.dlq.length) keys.splice(3, 0, "dlq");
+    if (this.ackMode === "after" && !keys.includes("dup")) keys.splice(3, 0, "dup");
     const score: ScoreItemView[] = keys.map((k) => ({
       key: k,
       // A plain queue has no compensation, so a failure here is never "clean".
@@ -388,7 +431,7 @@ export class QueueSim {
       },
       payments:
         this.payFault && now < this.payFault.until ? { state: this.payFault.mode, leftMs: this.payFault.until - now } : { state: "ok", leftMs: 0 },
-      side: null,
+      side: this.dlqOn || this.dlq.length ? { kind: "dlq", count: this.dlq.length, chips: this.dlq.map((o) => ({ id: o.id, label: `#${o.num}`, client: o.client })) } : null,
       workers,
       dots,
       panels: {
@@ -403,6 +446,7 @@ export class QueueSim {
       connected: true,
       sched: "fifo",
       ackAfter: this.ackMode === "after",
+      dlqOn: this.dlqOn,
     };
   }
 }

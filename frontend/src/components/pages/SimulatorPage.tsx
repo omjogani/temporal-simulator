@@ -156,6 +156,8 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       else if (a === "paySlow") sim?.payments("slow");
       else if (a === "declined") sim?.payments("declined");
       else if (a === "ackMode") sim?.toggleAckMode();
+      else if (a === "dlq") sim?.toggleDlq();
+      else if (a === "replayDlq") sim?.replayAll();
       else if (a === "bulkJob") sim?.bulkJob();
       else if (a === "pauseAll") sim?.pauseAll();
       return;
@@ -219,6 +221,8 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
       else if (k === "k" && has("ackMode")) action("ackMode");
+      else if (k === "q" && has("dlq")) action("dlq");
+      else if (k === "y" && has("replayDlq")) action("replayDlq");
       else if (k === "b" && has("bulkJob")) action("bulkJob");
       else if (k === "r") action("reset");
       else if (k === "m") sound.toggle();
@@ -260,6 +264,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
           sched={view.sched}
           payments={view.payments}
           ackAfter={view.ackAfter}
+          dlqOn={view.dlqOn}
           frozen={frozen}
           onTool={setTool}
           onAction={action}
@@ -275,7 +280,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       left={<WorkersPanel panels={view.panels} />}
       board={
         <ToolCursor tool={tool}>
-          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => (step.live ? void api.resume(id) : sim?.replay(id))} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }

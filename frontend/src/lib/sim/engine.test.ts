@@ -224,3 +224,80 @@ describe("step 1 does not reveal the VIP idea (that is step 4)", () => {
     expect(tryThisLines(getStep(1)!).some((l) => /vip/i.test(l))).toBe(false);
   });
 });
+
+describe("dead-letter queue", () => {
+  const parked = (sim: QueueSim) => sim.view().side?.chips ?? [];
+
+  test("with the DLQ on, a declined card parks the order instead of losing it", () => {
+    const sim = newSim();
+    sim.toggleDlq();
+    sim.payments("declined");
+    sim.flood();
+    expect(runUntilBanner(sim, /dead-letter/i, 60_000)).not.toBeNull();
+    runFor(sim, 60_000);
+    expect(score(sim, "failed")).toBe(1);
+    expect(score(sim, "lost")).toBe(0);
+    expect(score(sim, "dlq")).toBe(1);
+    expect(sim.view().side).toMatchObject({ kind: "dlq", count: 1 });
+    expect(parked(sim)[0].label).toMatch(/^#\d+$/);
+    expect(score(sim, "done")).toBe(29);
+  });
+
+  test("with the DLQ off nothing is parked and no DLQ box is shown", () => {
+    const sim = newSim();
+    sim.payments("declined");
+    sim.flood();
+    runFor(sim, 60_000);
+    expect(sim.view().side).toBeNull();
+    expect(score(sim, "lost")).toBe(1);
+  });
+
+  test("replaying a parked order sends it through again from the start", () => {
+    const sim = newSim();
+    sim.toggleDlq();
+    sim.payments("declined");
+    sim.flood();
+    runFor(sim, 60_000);
+    sim.replay(parked(sim)[0].id);
+    expect(sim.view().banner.text).toMatch(/Reserve stock/);
+    runFor(sim, 60_000);
+    expect(score(sim, "done")).toBe(30);
+    expect(score(sim, "dlq")).toBe(0);
+    expect(parked(sim)).toHaveLength(0);
+  });
+
+  test("replayAll empties the DLQ once Payments is back", () => {
+    const sim = newSim();
+    sim.toggleDlq();
+    sim.payments("down");
+    sim.flood();
+    runFor(sim, 11_000);
+    expect(score(sim, "dlq")).toBeGreaterThan(0);
+    expect(score(sim, "lost")).toBe(0);
+    sim.replayAll();
+    runFor(sim, 120_000);
+    expect(score(sim, "done")).toBe(30);
+    expect(score(sim, "dlq")).toBe(0);
+  });
+
+  test("a queue crash leaves the DLQ alone, and replaying into a down queue loses the order", () => {
+    const sim = newSim();
+    sim.toggleDlq();
+    sim.payments("declined");
+    sim.flood();
+    runFor(sim, 60_000);
+    const id = parked(sim)[0].id;
+    sim.hit("hub", "hammer");
+    expect(parked(sim)).toHaveLength(1);
+    sim.replay(id);
+    expect(score(sim, "lost")).toBe(1);
+    expect(parked(sim)).toHaveLength(0);
+  });
+
+  test("replaying an unknown order does nothing", () => {
+    const sim = newSim();
+    sim.toggleDlq();
+    sim.replay("sim-999");
+    expect(score(sim, "lost")).toBe(0);
+  });
+});

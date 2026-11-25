@@ -38,12 +38,13 @@ export const STEPS: StepConfig[] = [
     side: null,
     lanes: false,
     tools: ["hammer"],
-    actions: ["flood", "payDown", "paySlow", "declined", "ackMode", "bulkJob", "pauseAll"],
+    actions: ["flood", "payDown", "paySlow", "declined", "ackMode", "dlq", "replayDlq", "bulkJob", "pauseAll"],
     score: ["done", "inflight", "lost", "failed"],
     tryThis: [
       "Hammer a worker, then the queue: orders were deleted at hand-out.",
       "Ack after processing: no loss, but a crash charges the card twice.",
       "Payments down or declined: orders vanish, nothing retries or refunds.",
+      "Dead-letter queue: nothing vanishes, but someone must replay each order by hand.",
       "Drop a Bulk job: every other order waits behind all 40.",
       "Pause all: a queue can't pause mid-order, so the work is dropped.",
     ],
@@ -152,6 +153,8 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   payDownLong: { label: "⚡ Payments down 20 s", key: "L" },
   pauseAll: { label: "Pause all" },
   ackMode: { label: "Ack after processing", key: "K" },
+  dlq: { label: "Dead-letter queue", key: "Q" },
+  replayDlq: { label: "Replay DLQ", key: "Y" },
   bulkJob: { label: "Bulk job ×40", key: "B" },
   resumeAll: { label: "Resume all" },
   reset: { label: "Reset", key: "R" },
@@ -165,6 +168,7 @@ export const SCORE_META: Record<ScoreKey, { label: string; tone: "good" | "bad" 
   failed: { label: "Failed cleanly", tone: "gold" },
   paused: { label: "Paused", tone: "gold" },
   canceled: { label: "Canceled", tone: "neutral" },
+  dlq: { label: "In DLQ", tone: "gold" },
 };
 
 /** Worker pet names (index = worker id - 1). Must match backend/internal/orders WorkerNames. */

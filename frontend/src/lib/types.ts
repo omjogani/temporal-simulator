@@ -14,12 +14,14 @@ export type ActionId =
   | "payDownLong"
   | "pauseAll"
   | "ackMode"
+  | "dlq"
+  | "replayDlq"
   | "bulkJob"
   | "resumeAll"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
 export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}` | `o:${string}`;
-export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused" | "canceled";
+export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused" | "canceled" | "dlq";
 
 export type RowState =
   | "placeholder"
@@ -109,7 +111,7 @@ export interface ShelfChip {
 }
 
 export interface SideView {
-  kind: "paused";
+  kind: "paused" | "dlq";
   count: number;
   chips: ShelfChip[];
 }
@@ -164,6 +166,8 @@ export interface ArenaView {
   sched: SchedMode;
   /** Act 1 only: the plain queue acks after processing (redelivers on a crash). */
   ackAfter?: boolean;
+  /** Act 1 only: the plain queue has a dead-letter queue. */
+  dlqOn?: boolean;
   temporalUi?: string;
   queue?: { pollers: number[]; backlog: number };
   scene?: { idemKey: boolean; build: "good" | "bad" };

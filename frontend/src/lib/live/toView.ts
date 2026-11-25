@@ -185,6 +185,7 @@ export function liveView(s: Snapshot, cfg: StepConfig, now: number, connected: b
     failed: s.stats.failed,
     paused: s.stats.paused,
     canceled: s.stats.canceled,
+    dlq: 0, // Act 1 only
   };
   const score: ScoreItemView[] = cfg.score.map((k) => {
     const v = values[k];
