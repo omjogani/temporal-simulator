@@ -33,6 +33,9 @@ interface SimOrder {
   /** Charged on an earlier delivery: a redelivery charges the card again. */
   chargedBefore: boolean;
   queuedAt: number;
+  /** Queued behind a bulk job (set only when the presenter pressed Bulk job). */
+  behindBulk: boolean;
+  bulk: boolean;
 }
 
 interface SimWorker {
@@ -87,7 +90,7 @@ export class QueueSim {
     this.banner = { seq: this.banner.seq + 1, text };
   }
 
-  private spawn(client: number) {
+  private spawn(client: number, bulk = false) {
     this.num++;
     const o: SimOrder = {
       id: `sim-${this.num}`,
@@ -104,6 +107,8 @@ export class QueueSim {
       slow: false,
       chargedBefore: false,
       queuedAt: this.now,
+      behindBulk: this.queue.some((q) => q.bulk),
+      bulk,
     };
     this.orders.push(o);
     if (this.now < this.hubDown) {
@@ -139,7 +144,11 @@ export class QueueSim {
     w.order = null;
     this.stats.failed++;
     this.lose(o);
-    this.say(`Order #${o.num} failed: ${why}. The queue already deleted it, so nothing retries it and nothing is refunded or released.`);
+    this.say(
+      this.ackMode === "after"
+        ? `Order #${o.num} failed: ${why}. The worker dropped it, so nothing retries it and nothing is refunded or released.`
+        : `Order #${o.num} failed: ${why}. The queue already deleted it, so nothing retries it and nothing is refunded or released.`,
+    );
     return true;
   }
 
@@ -195,7 +204,7 @@ export class QueueSim {
         if (w.downUntil <= now && !w.order && this.queue.length) {
           const o = this.queue.shift()!;
           const waited = Math.round((now - o.queuedAt) / 1000);
-          if (o.client === VIP && waited >= 5) this.say(`VIP order #${o.num} waited ${waited} s behind the bulk job. A plain queue is first in, first out.`);
+          if (o.client === VIP && o.behindBulk && waited >= 5) this.say(`VIP order #${o.num} waited ${waited} s behind the bulk job. A plain queue is first in, first out.`);
           w.order = o;
           o.worker = w.id;
           o.state = "fetching";
@@ -315,7 +324,7 @@ export class QueueSim {
   }
 
   bulkJob() {
-    for (let i = 0; i < 40; i++) this.spawn(BULK);
+    for (let i = 0; i < 40; i++) this.spawn(BULK, true);
     this.say("A bulk job of 40 orders just landed in the queue.");
   }
 
@@ -372,7 +381,13 @@ export class QueueSim {
     const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
     const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, failed: this.stats.failed, paused: 0, canceled: 0 };
     const keys: ScoreKey[] = this.ackMode === "after" && !cfg.score.includes("dup") ? [...cfg.score.slice(0, 3), "dup", ...cfg.score.slice(3)] : cfg.score;
-    const score: ScoreItemView[] = keys.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
+    const score: ScoreItemView[] = keys.map((k) => ({
+      key: k,
+      // A plain queue has no compensation, so a failure here is never "clean".
+      label: k === "failed" ? "Failed" : SCORE_META[k].label,
+      value: values[k],
+      tone: values[k] || k === "done" ? (k === "failed" ? "bad" : SCORE_META[k].tone) : "neutral",
+    }));
 
     const hubDown = now < this.hubDown;
     return {

@@ -206,3 +206,33 @@ describe("pause all", () => {
     expect(onWorkers(sim)).toBe(0);
   });
 });
+
+describe("honest copy (final review fixes)", () => {
+  test("the VIP banner never blames a bulk job that did not happen", () => {
+    const sim = newSim();
+    sim.flood();
+    sim.setRunning(true);
+    expect(runUntilBanner(sim, /bulk job/i, 180_000)).toBeNull();
+  });
+
+  test("the Failed counter is red and not called clean in step 1", () => {
+    const sim = newSim();
+    sim.payments("declined");
+    sim.flood();
+    runUntilBanner(sim, /declined/i, 60_000);
+    const item = sim.view().panels.score.find((s) => s.key === "failed")!;
+    expect(item.label).toBe("Failed");
+    expect(item.tone).toBe("bad");
+  });
+
+  test("in ack-after mode a failed charge is not described as already deleted by the queue", () => {
+    const sim = newSim();
+    sim.toggleAckMode();
+    sim.payments("declined");
+    sim.flood();
+    const text = runUntilBanner(sim, /Order #\d+ failed/, 60_000);
+    expect(text).not.toBeNull();
+    expect(text).not.toMatch(/already deleted/i);
+    expect(text).toMatch(/worker dropped/i);
+  });
+});
