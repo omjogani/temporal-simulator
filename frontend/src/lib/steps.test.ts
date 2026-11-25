@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getStep, neighbours, sectionOf, tryThisLines } from "./steps";
+import { getStep, neighbours, sectionKeys, sectionOf, tryThisLines } from "./steps";
 import type { StepConfig } from "./steps";
 
 const step = (tryThis: StepConfig["tryThis"]) => ({ tryThis }) as StepConfig;
@@ -63,5 +63,20 @@ describe("step 1 button sections", () => {
   test("steps 2 to 5 keep their single toolbar", () => {
     for (const id of [2, 3, 4, 5]) expect(getStep(id)!.sections).toBeUndefined();
     expect(sectionOf(getStep(2)!, "hammer")).toBeUndefined();
+  });
+});
+
+describe("section hotkey hints", () => {
+  const step1 = getStep(1)!;
+
+  test("sectionKeys lists the hotkeys of a tab, tools first, skipping buttons without a key", () => {
+    expect(sectionKeys(step1, "crashes")).toEqual(["H", "F", "K"]);
+    expect(sectionKeys(step1, "payments")).toEqual(["Z", "S", "D", "Q", "Y"]);
+    expect(sectionKeys(step1, "load")).toEqual(["B"]);
+  });
+
+  test("an unknown section has no keys", () => {
+    expect(sectionKeys(step1, "nope")).toEqual([]);
+    expect(sectionKeys(getStep(2)!, "crashes")).toEqual([]);
   });
 });

@@ -37,6 +37,18 @@
   gap: 6px;
   align-items: center;
 }
+.hint {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  font: 500 11px / 1 var(--font-mono);
+  color: var(--c-dim);
+  white-space: nowrap;
+}
+.hint kbd {
+  margin-left: 3px;
+}
+
 .sep {
   width: 1px;
   height: 26px;

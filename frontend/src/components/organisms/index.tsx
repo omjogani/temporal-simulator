@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button, Kbd, Switch, UrlPill } from "@/components/atoms";
 import { SpeakerIcon, TOOL_ICONS } from "@/components/atoms/icons";
 import { LaneBar, PolicyList, ScoreStat, SegmentedControl, ToolButton, WorkerRow } from "@/components/molecules";
-import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, neighbours, routeFor, type StepConfig } from "@/lib/steps";
+import { ACTION_META, CLIENT_COLORS, STEPS, TOOL_META, neighbours, routeFor, sectionKeys, type StepConfig } from "@/lib/steps";
 import type { ActionId, ArenaView, PanelsView, PaymentsView, SchedMode, ToolId } from "@/lib/types";
 import styles from "./organisms.module.css";
 
@@ -104,6 +104,15 @@ export function Toolbox({ step, tool, sched, payments, ackAfter, dlqOn, dlqParke
       {step.sections && onSection && (
         <>
           <SegmentedControl<string> label="Section" value={active!.id} onChange={onSection} options={step.sections.map((s) => ({ value: s.id, label: s.label }))} />
+          <span className={styles.hint} aria-label="Hotkeys of the other tabs">
+            {step.sections
+              .filter((s) => s.id !== active!.id)
+              .map((s) => (
+                <span key={s.id}>
+                  {s.label} {sectionKeys(step, s.id).map((k) => <Kbd key={k}>{k}</Kbd>)}
+                </span>
+              ))}
+          </span>
           <span className={styles.sep} />
         </>
       )}

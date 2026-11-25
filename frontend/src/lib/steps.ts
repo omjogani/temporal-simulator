@@ -136,6 +136,14 @@ export const tryThisLines = (step: StepConfig): string[] => (Array.isArray(step.
 export const sectionOf = (step: StepConfig, item: ToolId | ActionId | "sched"): string | undefined =>
   step.sections?.find((s) => [...(s.tools ?? []), ...s.actions].includes(item as never))?.id;
 
+/** The hotkeys of a tab's buttons (tools first), for the hint that shows keys of the tabs you are not on. */
+export const sectionKeys = (step: StepConfig, id: string): string[] => {
+  const s = step.sections?.find((x) => x.id === id);
+  if (!s) return [];
+  const keys = [...(s.tools ?? []).map((t) => TOOL_META[t].key), ...s.actions.map((a) => ACTION_META[a].key)];
+  return keys.filter((k): k is string => !!k);
+};
+
 export const routeFor = (cfg: StepConfig): string => `/${cfg.id}`;
 
 /** Routes of the previous and next step (← → keys). */
