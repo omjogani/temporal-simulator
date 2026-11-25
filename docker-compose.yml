@@ -81,7 +81,7 @@ services:
     restart: "no"
 
   temporal-ui:
-    image: temporalio/ui:2.57.0
+    image: temporalio/ui:2.58.1
     container_name: temporal-sim-ui
     depends_on:
       - temporal
