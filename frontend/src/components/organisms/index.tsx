@@ -60,6 +60,8 @@ interface ToolboxProps {
   tool: ToolId;
   sched: SchedMode;
   payments: PaymentsView;
+  /** Act 1: the plain queue acks after processing. */
+  ackAfter?: boolean;
   frozen: boolean;
   onTool: (t: ToolId) => void;
   onAction: (a: ActionId) => void;
@@ -86,7 +88,7 @@ function ToolIcon({ tool }: { tool: ToolId }) {
   return <Icon size={20} />;
 }
 
-export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, scene, onSwitch, errorMode }: ToolboxProps) {
+export function Toolbox({ step, tool, sched, payments, ackAfter, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, scene, onSwitch, errorMode }: ToolboxProps) {
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
       {step.tools.map((t) => (
@@ -107,7 +109,7 @@ export function Toolbox({ step, tool, sched, payments, frozen, onTool, onAction,
             ]}
           />
         ) : (
-          <ToolButton key={a} label={actionLabel(a, payments)} hotkey={ACTION_META[a].key} pressed={payActive(a, payments)} onClick={() => onAction(a)} />
+          <ToolButton key={a} label={actionLabel(a, payments)} hotkey={ACTION_META[a].key} pressed={payActive(a, payments) || (a === "ackMode" && !!ackAfter)} onClick={() => onAction(a)} />
         ),
       )}
       {step.switches?.includes("idemKey") && scene && onSwitch && (

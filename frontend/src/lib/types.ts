@@ -13,6 +13,7 @@ export type ActionId =
   | "paySlow"
   | "payDownLong"
   | "pauseAll"
+  | "ackMode"
   | "resumeAll"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
@@ -160,6 +161,8 @@ export interface ArenaView {
   banner: { seq: number; text: string };
   connected: boolean;
   sched: SchedMode;
+  /** Act 1 only: the plain queue acks after processing (redelivers on a crash). */
+  ackAfter?: boolean;
   temporalUi?: string;
   queue?: { pollers: number[]; backlog: number };
   scene?: { idemKey: boolean; build: "good" | "bad" };

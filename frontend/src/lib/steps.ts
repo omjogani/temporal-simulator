@@ -37,7 +37,7 @@ export const STEPS: StepConfig[] = [
     side: null,
     lanes: false,
     tools: ["hammer"],
-    actions: ["flood", "payDown", "paySlow", "declined"],
+    actions: ["flood", "payDown", "paySlow", "declined", "ackMode"],
     score: ["done", "inflight", "lost", "failed"],
     tryThis:
       "Hammer a busy worker. The queue deleted that order when it handed it out, so it dies halfway: stock reserved, card charged, never shipped. Then hammer the queue: every waiting order is gone, and new orders fail for 10 s.",
@@ -131,6 +131,7 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   paySlow: { label: "🐌 Payments slow", key: "S" },
   payDownLong: { label: "⚡ Payments down 20 s", key: "L" },
   pauseAll: { label: "Pause all" },
+  ackMode: { label: "Ack after processing", key: "K" },
   resumeAll: { label: "Resume all" },
   reset: { label: "Reset", key: "R" },
 };

@@ -27,6 +27,8 @@ interface SimOrder {
   endedAt: number;
   chargeTried: boolean;
   slow: boolean;
+  /** Charged on an earlier delivery: a redelivery charges the card again. */
+  chargedBefore: boolean;
 }
 
 interface SimWorker {
@@ -63,9 +65,11 @@ export class QueueSim {
   /** Clients only place orders after the presenter presses Play. */
   running = false;
   private hubDown = 0;
-  private stats = { done: 0, lost: 0, failed: 0 };
+  private stats = { done: 0, lost: 0, failed: 0, dup: 0 };
   private payFault: { mode: "down" | "slow"; until: number } | null = null;
   private declineNext = false;
+  /** "auto": the queue deletes an order when it hands it out. "after": it only deletes after the worker finishes, so crashes redeliver. */
+  ackMode: "auto" | "after" = "auto";
   private banner = { seq: 0, text: "" };
 
   constructor(cfg: SimConfig) {
@@ -94,6 +98,7 @@ export class QueueSim {
       endedAt: 0,
       chargeTried: false,
       slow: false,
+      chargedBefore: false,
     };
     this.orders.push(o);
     if (this.now < this.hubDown) {
@@ -131,6 +136,28 @@ export class QueueSim {
     this.lose(o);
     this.say(`Order #${o.num} failed: ${why}. The queue already deleted it, so nothing retries it and nothing is refunded or released.`);
     return true;
+  }
+
+  toggleAckMode() {
+    this.ackMode = this.ackMode === "auto" ? "after" : "auto";
+    this.say(
+      this.ackMode === "after"
+        ? "Ack after processing: the queue keeps each order until a worker finishes it, so a crash redelivers it."
+        : "Auto-ack: the queue deletes each order as soon as it hands it to a worker.",
+    );
+  }
+
+  /** At-least-once: the queue never saw an ack, so the whole order goes back to the front and starts again. */
+  private redeliver(o: SimOrder) {
+    o.chargedBefore ||= o.charged;
+    o.state = "queued";
+    o.worker = 0;
+    o.done = [false, false, false, false];
+    o.cur = 0;
+    o.t = 0;
+    o.chargeTried = false;
+    o.slow = false;
+    this.queue.unshift(o);
   }
 
   /** Start a Payments fault: down (500s) or slow (5 s calls) for 10 s, or decline the next card. */
@@ -187,6 +214,10 @@ export class QueueSim {
           if (o.cur === CHARGE && o.t >= this.actMs(o) / 2) o.charged = true;
           if (o.t >= this.actMs(o)) {
             o.done[o.cur] = true;
+            if (o.cur === CHARGE && o.chargedBefore) {
+              this.stats.dup++;
+              this.say(`Order #${o.num} was charged twice: the queue redelivered it after the crash.`);
+            }
             o.cur++;
             o.t = 0;
             if (o.cur >= 4) {
@@ -225,6 +256,13 @@ export class QueueSim {
       if (!o) return this.say(`${workerName(w.id)} crashed while idle.`);
       const doneN = o.done.filter(Boolean).length;
       const stepName = STEP_NAMES[Math.min(o.cur, 3)];
+      if (this.ackMode === "after") {
+        this.redeliver(o);
+        this.say(
+          `${workerName(w.id)} died during “${stepName}”. The queue never got an ack, so it redelivers order #${o.num}${o.charged ? ", and the card will be charged again" : ""}.`,
+        );
+        return;
+      }
       this.lose(o);
       this.say(
         `${workerName(w.id)} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
@@ -293,8 +331,9 @@ export class QueueSim {
     }
 
     const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: this.stats.failed, paused: 0, canceled: 0 };
-    const score: ScoreItemView[] = cfg.score.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, failed: this.stats.failed, paused: 0, canceled: 0 };
+    const keys: ScoreKey[] = this.ackMode === "after" && !cfg.score.includes("dup") ? [...cfg.score.slice(0, 3), "dup", ...cfg.score.slice(3)] : cfg.score;
+    const score: ScoreItemView[] = keys.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
 
     const hubDown = now < this.hubDown;
     return {
@@ -324,6 +363,7 @@ export class QueueSim {
       banner: this.banner,
       connected: true,
       sched: "fifo",
+      ackAfter: this.ackMode === "after",
     };
   }
 }
