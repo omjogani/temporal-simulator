@@ -63,6 +63,11 @@ interface ToolboxProps {
   ackAfter?: boolean;
   /** Act 1: the plain queue has a dead-letter queue. */
   dlqOn?: boolean;
+  /** Act 1: orders parked in the dead-letter queue (Replay DLQ only shows when there are some). */
+  dlqParked?: number;
+  /** Toolbox tabs (step 1): the active section id and its setter. */
+  section?: string;
+  onSection?: (id: string) => void;
   frozen: boolean;
   onTool: (t: ToolId) => void;
   onAction: (a: ActionId) => void;
@@ -89,14 +94,24 @@ function ToolIcon({ tool }: { tool: ToolId }) {
   return <Icon size={20} />;
 }
 
-export function Toolbox({ step, tool, sched, payments, ackAfter, dlqOn, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, scene, onSwitch, errorMode }: ToolboxProps) {
+export function Toolbox({ step, tool, sched, payments, ackAfter, dlqOn, dlqParked, section, onSection, frozen, onTool, onAction, onSched, onFreeze, muted, onSound, scene, onSwitch, errorMode }: ToolboxProps) {
+  // Steps with tabs show only the active tab's tools and actions; the rest stay one hotkey away.
+  const active = step.sections?.find((s) => s.id === section) ?? step.sections?.[0];
+  const tools = active ? (active.tools ?? []) : step.tools;
+  const actions = active ? active.actions.filter((a) => a !== "replayDlq" || !!dlqParked) : step.actions;
   return (
     <div className={styles.toolbox} role="toolbar" aria-label="Tools">
-      {step.tools.map((t) => (
+      {step.sections && onSection && (
+        <>
+          <SegmentedControl<string> label="Section" value={active!.id} onChange={onSection} options={step.sections.map((s) => ({ value: s.id, label: s.label }))} />
+          <span className={styles.sep} />
+        </>
+      )}
+      {tools.map((t) => (
         <ToolButton key={t} label={TOOL_META[t].label} hotkey={TOOL_META[t].key} pressed={tool === t} onClick={() => onTool(t)} icon={<ToolIcon tool={t} />} caption={t === "error" && errorMode ? `${TOOL_META[t].short} ${errorMode}` : TOOL_META[t].short} />
       ))}
-      <span className={styles.sep} />
-      {step.actions.map((a) =>
+      {tools.length > 0 && <span className={styles.sep} />}
+      {actions.map((a) =>
         a === "sched" ? (
           <SegmentedControl<SchedMode>
             key={a}

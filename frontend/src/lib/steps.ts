@@ -8,6 +8,14 @@ export interface CodeSnippet {
   anchors: Partial<Record<CodeAnchor, number>>;
 }
 
+/** A tab of the toolbox: only the active section's buttons are shown (step 1, where there are many). */
+export interface StepSection {
+  id: string;
+  label: string;
+  tools?: ToolId[];
+  actions: ActionId[];
+}
+
 export interface StepConfig {
   section: "steps";
   rule?: string;
@@ -22,6 +30,8 @@ export interface StepConfig {
   lanes: boolean;
   tools: ToolId[];
   actions: (ActionId | "sched")[];
+  /** Optional toolbox tabs. Every tool and action of the step belongs to exactly one. */
+  sections?: StepSection[];
   score: ScoreKey[];
   /** One caption, or numbered beats for a longer story. */
   tryThis: string | string[];
@@ -39,6 +49,11 @@ export const STEPS: StepConfig[] = [
     lanes: false,
     tools: ["hammer"],
     actions: ["flood", "payDown", "paySlow", "declined", "ackMode", "dlq", "replayDlq", "bulkJob", "pauseAll"],
+    sections: [
+      { id: "crashes", label: "Crashes", tools: ["hammer"], actions: ["flood", "ackMode"] },
+      { id: "payments", label: "Payments", actions: ["payDown", "paySlow", "declined", "dlq", "replayDlq"] },
+      { id: "load", label: "Load", actions: ["bulkJob", "pauseAll"] },
+    ],
     score: ["done", "inflight", "lost", "failed"],
     tryThis: [
       "Hammer a worker, then the queue: orders were deleted at hand-out.",
@@ -116,6 +131,10 @@ export const stepAccent = (id: number): string => `var(--c-step-${id})`;
 
 /** The caption as a list of lines: a plain string is a single line. */
 export const tryThisLines = (step: StepConfig): string[] => (Array.isArray(step.tryThis) ? step.tryThis : [step.tryThis]);
+
+/** The toolbox tab a tool or action lives in, if the step has tabs (so a hotkey can reveal its button). */
+export const sectionOf = (step: StepConfig, item: ToolId | ActionId | "sched"): string | undefined =>
+  step.sections?.find((s) => [...(s.tools ?? []), ...s.actions].includes(item as never))?.id;
 
 export const routeFor = (cfg: StepConfig): string => `/${cfg.id}`;
 

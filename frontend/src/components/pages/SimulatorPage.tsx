@@ -12,7 +12,7 @@ import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
-import { neighbours, stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
+import { neighbours, sectionOf, stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
@@ -30,6 +30,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
   const step = config;
   const router = useRouter();
   const [tool, setTool] = useState<ToolId>(step.tools[0]);
+  const [section, setSection] = useState<string | undefined>(step.sections?.[0]?.id);
   const [selected, setSelected] = useState<string | null>(null);
   const [errorMode, setErrorMode] = useState<"500" | "declined">("500");
   const [bubble, setBubble] = useState<Bubble | null>(null);
@@ -143,7 +144,14 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
     } else if (node === "hub" && tool === "hammer") void api.hammerTemporal();
   };
 
+  /** A hotkey (or click) on a button in another tab brings that tab forward. */
+  const reveal = (item: ToolId | ActionId) => {
+    const s = sectionOf(step, item);
+    if (s) setSection(s);
+  };
+
   const action = (a: ActionId) => {
+    reveal(a);
     if (a === "reset") {
       setResetCount((n) => n + 1);
       if (step.live) void api.step(step.id, true);
@@ -210,7 +218,10 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
         /* picked */
       } else if (k === "c" && pick("freeze")) {
         /* picked */
-      } else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
+      } else if (k === "h" && step.tools.includes("hammer")) {
+        setTool("hammer");
+        reveal("hammer");
+      }
       else if (k === "z" && has("payDown")) action("payDown");
       else if (k === "s" && has("paySlow")) action("paySlow");
       else if (k === "l" && has("payDownLong")) action("payDownLong");
@@ -265,6 +276,9 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
           payments={view.payments}
           ackAfter={view.ackAfter}
           dlqOn={view.dlqOn}
+          dlqParked={view.side?.kind === "dlq" ? view.side.count : 0}
+          section={section}
+          onSection={setSection}
           frozen={frozen}
           onTool={setTool}
           onAction={action}
