@@ -9,8 +9,11 @@ import type { ArenaView, ChecklistRowView, DotView, NodeId, ScoreItemView, Score
 const ACT_MS = 700;
 const EVERY: [number, number] = [2600, 3800];
 const CHARGE = 1;
+const PAY_MS = 10_000;
+const SLOW_MS = 5_000;
+const BULK = 3;
 
-type OState = "queued" | "fetching" | "running" | "done" | "lost";
+type OState = "queued" | "fetching" | "running" | "done" | "lost" | "parked";
 
 interface SimOrder {
   id: string;
@@ -23,6 +26,10 @@ interface SimOrder {
   t: number; // ms spent in the current state
   charged: boolean;
   endedAt: number;
+  chargeTried: boolean;
+  slow: boolean;
+  /** Charged on an earlier delivery: a redelivery charges the card again. */
+  chargedBefore: boolean;
 }
 
 interface SimWorker {
@@ -59,7 +66,14 @@ export class QueueSim {
   /** Clients only place orders after the presenter presses Play. */
   running = false;
   private hubDown = 0;
-  private stats = { done: 0, lost: 0 };
+  private stats = { done: 0, lost: 0, failed: 0, dup: 0 };
+  private payFault: { mode: "down" | "slow"; until: number } | null = null;
+  private declineNext = false;
+  private dlqOn = false;
+  /** Orders the queue gave up on and parked. A separate queue, so a crash of the main one does not touch it. */
+  private dlq: SimOrder[] = [];
+  /** "auto": the queue deletes an order when it hands it out. "after": it only deletes after the worker finishes, so crashes redeliver. */
+  ackMode: "auto" | "after" = "auto";
   private banner = { seq: 0, text: "" };
 
   constructor(cfg: SimConfig) {
@@ -86,6 +100,9 @@ export class QueueSim {
       t: 0,
       charged: false,
       endedAt: 0,
+      chargeTried: false,
+      slow: false,
+      chargedBefore: false,
     };
     this.orders.push(o);
     if (this.now < this.hubDown) {
@@ -100,6 +117,103 @@ export class QueueSim {
     o.state = "lost";
     o.endedAt = this.now;
     this.stats.lost++;
+  }
+
+  /** How long the order's current activity lasts: Charge stretches to 5 s while Payments is slow. */
+  private actMs(o: SimOrder) {
+    return o.cur === CHARGE && o.slow ? SLOW_MS : ACT_MS;
+  }
+
+  /** Payments is called when an order starts Charge; a plain queue has no retry or compensation. */
+  private tryCharge(o: SimOrder, w: SimWorker): boolean {
+    o.chargeTried = true;
+    const fault = this.payFault && this.now < this.payFault.until ? this.payFault.mode : null;
+    let why = "";
+    if (this.declineNext) {
+      this.declineNext = false;
+      why = "the card was declined";
+    } else if (fault === "down") why = "the Payments API is down";
+    else if (fault === "slow") o.slow = true;
+    if (!why) return false;
+    w.order = null;
+    this.stats.failed++;
+    if (this.dlqOn) {
+      o.state = "parked";
+      this.dlq.push(o);
+      this.say(`Order #${o.num} failed: ${why}. The queue parked it in the dead-letter queue: the data is safe, but nothing retries it, refunds it or releases its stock until someone looks.`);
+      return true;
+    }
+    this.lose(o);
+    this.say(
+      this.ackMode === "after"
+        ? `Order #${o.num} failed: ${why}. The worker dropped it, so nothing retries it and nothing is refunded or released.`
+        : `Order #${o.num} failed: ${why}. The queue already deleted it, so nothing retries it and nothing is refunded or released.`,
+    );
+    return true;
+  }
+
+  toggleAckMode() {
+    this.ackMode = this.ackMode === "auto" ? "after" : "auto";
+    this.say(
+      this.ackMode === "after"
+        ? "Ack after processing: the queue keeps each order until a worker finishes it, so a crash redelivers it."
+        : "Auto-ack: the queue deletes each order as soon as it hands it to a worker.",
+    );
+  }
+
+  /** At-least-once: the queue never saw an ack, so the whole order goes back to the front and starts again. */
+  private redeliver(o: SimOrder) {
+    o.chargedBefore ||= o.charged;
+    o.state = "queued";
+    o.worker = 0;
+    o.done = [false, false, false, false];
+    o.cur = 0;
+    o.t = 0;
+    o.chargeTried = false;
+    o.slow = false;
+    this.queue.unshift(o);
+  }
+
+  toggleDlq() {
+    this.dlqOn = !this.dlqOn;
+    this.say(this.dlqOn ? "Dead-letter queue on: orders the queue can't process are parked instead of dropped." : "Dead-letter queue off: failed orders are dropped.");
+  }
+
+  /** A person replays one parked order: it goes to the back of the queue and starts again from the first step. */
+  replay(id: string) {
+    const i = this.dlq.findIndex((o) => o.id === id);
+    if (i < 0) return;
+    const [o] = this.dlq.splice(i, 1);
+    if (this.now < this.hubDown) {
+      this.lose(o);
+      this.say(`Order #${o.num} can't be replayed: the queue is down.`);
+      return;
+    }
+    o.state = "queued";
+    o.worker = 0;
+    o.done = [false, false, false, false];
+    o.cur = 0;
+    o.t = 0;
+    o.charged = false;
+    o.chargeTried = false;
+    o.slow = false;
+    this.queue.push(o);
+    this.say(`Replaying order #${o.num} from the start: Reserve stock runs again, and the first reservation was never released.`);
+  }
+
+  replayAll() {
+    for (const o of [...this.dlq]) this.replay(o.id);
+  }
+
+  /** Start a Payments fault: down (500s) or slow (5 s calls) for 10 s, or decline the next card. */
+  payments(mode: "down" | "slow" | "declined") {
+    if (mode === "declined") {
+      this.declineNext = true;
+      this.say("The next card will be declined.");
+      return;
+    }
+    this.payFault = { mode, until: this.now + PAY_MS };
+    this.say(mode === "down" ? "Payments API is down for 10 s." : "Payments API is slow for 10 s: charges take 5 s.");
   }
 
   /**
@@ -139,9 +253,16 @@ export class QueueSim {
           break;
         case "running": {
           if (!w) break;
-          if (o.cur === CHARGE && o.t >= ACT_MS / 2) o.charged = true;
-          if (o.t >= ACT_MS) {
+          if (o.cur === CHARGE && !o.chargeTried) {
+            if (this.tryCharge(o, w)) break;
+          }
+          if (o.cur === CHARGE && o.t >= this.actMs(o) / 2) o.charged = true;
+          if (o.t >= this.actMs(o)) {
             o.done[o.cur] = true;
+            if (o.cur === CHARGE && o.chargedBefore) {
+              this.stats.dup++;
+              this.say(`Order #${o.num} was charged twice: the queue redelivered it after the crash.`);
+            }
             o.cur++;
             o.t = 0;
             if (o.cur >= 4) {
@@ -180,6 +301,13 @@ export class QueueSim {
       if (!o) return this.say(`${workerName(w.id)} crashed while idle.`);
       const doneN = o.done.filter(Boolean).length;
       const stepName = STEP_NAMES[Math.min(o.cur, 3)];
+      if (this.ackMode === "after") {
+        this.redeliver(o);
+        this.say(
+          `${workerName(w.id)} died during “${stepName}”. The queue never got an ack, so it redelivers order #${o.num}${o.charged ? ", and the card will be charged again" : ""}.`,
+        );
+        return;
+      }
       this.lose(o);
       this.say(
         `${workerName(w.id)} died during “${stepName}”. The queue already deleted order #${o.num}, so it's lost with ${doneN} of 4 steps done${o.charged ? " and the card already charged" : ""}.`,
@@ -201,6 +329,30 @@ export class QueueSim {
     this.say("30 orders incoming.");
   }
 
+  /** A plain queue cannot pause an order mid-flight: the only way to stop work is to stop the consumers. */
+  pauseAll() {
+    let held = 0;
+    for (const w of this.workers) {
+      w.downUntil = Infinity;
+      const o = w.order;
+      w.order = null;
+      if (!o) continue;
+      held++;
+      if (this.ackMode === "after") this.redeliver(o);
+      else this.lose(o);
+    }
+    this.say(
+      this.ackMode === "after"
+        ? `A queue can't pause an order mid-flight: stopping the workers sent ${held} back to the queue. Nothing resumes them.`
+        : `A queue can't pause an order mid-flight: stopping the workers dropped ${held} of them. The rest sit in the queue and nothing resumes them.`,
+    );
+  }
+
+  bulkJob() {
+    for (let i = 0; i < 40; i++) this.spawn(BULK);
+    this.say("A bulk job of 40 orders just landed. Everything behind it waits: a plain queue is first in, first out.");
+  }
+
   view(): ArenaView {
     const now = this.now;
     const cfg = this.cfg;
@@ -210,12 +362,16 @@ export class QueueSim {
       const rows: ChecklistRowView[] = STEP_NAMES.map((label, i) => {
         if (!o) return { label, state: "placeholder" };
         if (o.done[i]) return { label, state: "done" };
-        if (i === o.cur && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / ACT_MS) };
+        if (i === o.cur && o.state === "running") return { label, state: "running", progress: Math.min(1, o.t / this.actMs(o)) };
         return { label, state: "pending" };
       });
       let status = "idle";
       let statusTone: WorkerCardView["statusTone"] = "dim";
-      if (down) {
+      const stopped = w.downUntil === Infinity;
+      if (stopped) {
+        status = "STOPPED";
+        statusTone = "bad";
+      } else if (down) {
         status = `DOWN · ${Math.ceil((w.downUntil - now) / 1000)}s`;
         statusTone = "bad";
       } else if (o?.state === "fetching") status = "fetching";
@@ -226,7 +382,7 @@ export class QueueSim {
       return {
         id: w.id,
         up: !down,
-        downLeftMs: Math.max(0, w.downUntil - now),
+        downLeftMs: stopped ? HAMMER_MS : Math.max(0, w.downUntil - now),
         status,
         statusTone,
         orderLabel: o ? `Order #${o.num}` : undefined,
@@ -244,12 +400,22 @@ export class QueueSim {
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: o.charged ? "charged" : "none" });
       else if (o.state === "done")
         dots.push({ id: o.id, client: o.client, loc: { kind: "worker", worker: o.worker }, ring: "done", fate: "done" });
+      else if (o.state === "parked") dots.push({ id: o.id, client: o.client, loc: { kind: "side", slot: this.dlq.indexOf(o) }, ring: "failed", hidden: true });
       else if (o.state === "lost") dots.push({ id: o.id, client: o.client, loc: { kind: "gone" }, ring: "none", fate: "lost" });
     }
 
-    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost").length;
-    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: 0, failed: 0, paused: 0 };
-    const score: ScoreItemView[] = cfg.score.map((k) => ({ key: k, label: SCORE_META[k].label, value: values[k], tone: values[k] || k === "done" ? SCORE_META[k].tone : "neutral" }));
+    const inflight = this.orders.filter((o) => o.state !== "done" && o.state !== "lost" && o.state !== "parked").length;
+    const values: Record<ScoreKey, number> = { done: this.stats.done, inflight, lost: this.stats.lost, dup: this.stats.dup, failed: this.stats.failed, dlq: this.dlq.length, paused: 0, canceled: 0 };
+    const keys: ScoreKey[] = [...cfg.score];
+    if (this.dlqOn || this.dlq.length) keys.splice(3, 0, "dlq");
+    if (this.ackMode === "after" && !keys.includes("dup")) keys.splice(3, 0, "dup");
+    const score: ScoreItemView[] = keys.map((k) => ({
+      key: k,
+      // A plain queue has no compensation, so a failure here is never "clean".
+      label: k === "failed" ? "Failed" : SCORE_META[k].label,
+      value: values[k],
+      tone: values[k] || k === "done" ? (k === "failed" ? "bad" : SCORE_META[k].tone) : "neutral",
+    }));
 
     const hubDown = now < this.hubDown;
     return {
@@ -263,14 +429,15 @@ export class QueueSim {
         lanes: false,
         store: "memory",
       },
-      payments: { state: "ok", leftMs: 0 },
-      side: null,
+      payments:
+        this.payFault && now < this.payFault.until ? { state: this.payFault.mode, leftMs: this.payFault.until - now } : { state: "ok", leftMs: 0 },
+      side: this.dlqOn || this.dlq.length ? { kind: "dlq", count: this.dlq.length, chips: this.dlq.map((o) => ({ id: o.id, label: `#${o.num}`, client: o.client })) } : null,
       workers,
       dots,
       panels: {
         workers: this.workers.map((w) => {
           const down = now < w.downUntil;
-          return { id: w.id, up: !down, note: down ? `down · ${Math.ceil((w.downUntil - now) / 1000)}s` : w.order ? "busy" : "idle", noteTone: down ? "bad" : "dim", completed: w.completed };
+          return { id: w.id, up: !down, note: w.downUntil === Infinity ? "stopped" : down ? `down · ${Math.ceil((w.downUntil - now) / 1000)}s` : w.order ? "busy" : "idle", noteTone: down ? "bad" : "dim", completed: w.completed };
         }),
         service: { label: "Queue", up: !hubDown, note: hubDown ? `${Math.ceil((this.hubDown - now) / 1000)}s` : "●" },
         score,
@@ -278,6 +445,8 @@ export class QueueSim {
       banner: this.banner,
       connected: true,
       sched: "fifo",
+      ackAfter: this.ackMode === "after",
+      dlqOn: this.dlqOn,
     };
   }
 }

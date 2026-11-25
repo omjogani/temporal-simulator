@@ -95,7 +95,7 @@ export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => vo
   const interior = down ? 0.35 : hub.starting ? 0.7 : 1;
   return (
     <Hit node="hub" label={hub.label} onHit={onHit}>
-      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={down} highlight={hub.starting} roof={temporal ? "straight" : "crooked"} />
+      <NodeFrame x={HUB.x} y={HUB.y} w={HUB.w} h={HUB.h} down={down} highlight={hub.starting} roof="straight" />
       <g opacity={interior}>
         <SvgText x={left + 14} y={top + 21} letterSpacing={1} weight={600}>
           {hub.label.toUpperCase()}
@@ -161,15 +161,18 @@ export function HubNode({ hub, onHit }: { hub: HubView; onHit: (n: NodeId) => vo
 export function SideNode({ side, onHit, onResume }: { side: SideView; onHit: (n: NodeId) => void; onResume: (id: string) => void }) {
   const left = SIDE.x - SIDE.w / 2;
   const top = SIDE.y - SIDE.h / 2;
+  const dlq = side.kind === "dlq";
   return (
     <g>
-      <Hit node="side" label="Paused orders" onHit={onHit}>
+      <Hit node="side" label={dlq ? "Dead-letter queue" : "Paused orders"} onHit={onHit}>
         <NodeFrame x={SIDE.x} y={SIDE.y} w={SIDE.w} h={SIDE.h} />
-        <g transform={`translate(${left + 10},${top + 9})`}>
-          <PauseHandIcon size={14} />
-        </g>
-        <SvgText x={left + 28} y={top + 20} size={11} letterSpacing={1} tone="gold">
-          PAUSED
+        {!dlq && (
+          <g transform={`translate(${left + 10},${top + 9})`}>
+            <PauseHandIcon size={14} />
+          </g>
+        )}
+        <SvgText x={left + (dlq ? 12 : 28)} y={top + 20} size={11} letterSpacing={1} tone="gold">
+          {dlq ? "DEAD LETTERS" : "PAUSED"}
         </SvgText>
         {[0, 1, 2].map((r) => (
           <line key={r} x1={left + 8} x2={left + SIDE.w - 8} y1={top + 52 + r * 22} y2={top + 52 + r * 22} strokeWidth={2} style={{ stroke: "var(--c-line)" }} />

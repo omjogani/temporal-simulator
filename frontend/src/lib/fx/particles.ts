@@ -104,6 +104,9 @@ export function burst(e: Effect): Particle[] {
         return p("line", { vx: Math.cos(a) * v, vy: Math.sin(a) * v, rot: a, drag: 0.005, size: between(4, 7), additive: true, ttl: between(300, 500) });
       });
 
+    case "label":
+      return [p("text", { text: e.text, vy: -0.04, size: 18 })];
+
     case "shake":
       return [];
   }

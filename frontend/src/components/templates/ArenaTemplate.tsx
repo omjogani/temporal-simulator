@@ -16,12 +16,14 @@ interface Props {
   board: ReactNode;
   overlay?: ReactNode;
   right: ReactNode;
+  /** Optional strip under the board (idiom scenes: workflow history). */
+  strip?: ReactNode;
   caption: ReactNode;
   banner: ReactNode;
 }
 
 /** Page layout of the simulator: top bar, panel | board | panel, caption, step rail. */
-export function ArenaTemplate({ accent, backdrop, url, title, tag, extra, speed, toolbox, left, board, overlay, right, caption, banner }: Props) {
+export function ArenaTemplate({ accent, backdrop, url, title, tag, extra, speed, toolbox, left, board, overlay, right, strip, caption, banner }: Props) {
   return (
     <main className={styles.arena} style={{ "--c-accent": accent } as CSSProperties}>
       <header className={styles.top}>
@@ -43,6 +45,7 @@ export function ArenaTemplate({ accent, backdrop, url, title, tag, extra, speed,
           {board}
           {overlay}
         </div>
+        {strip && <div className={styles.strip}>{strip}</div>}
         <div className={styles.right}>{right}</div>
       </div>
       <div className={styles.foot}>

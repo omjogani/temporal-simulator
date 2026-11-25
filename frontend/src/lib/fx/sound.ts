@@ -14,12 +14,16 @@ export function soundFor(ev: FxEvent): SoundName | null {
       return "thud";
     case "workerUp":
     case "hubUp":
+    case "orderCanceled":
+    case "replayed":
       return "pop";
     case "orderDone":
       return "ding";
     case "orderLost":
     case "orderFailed":
     case "duplicate":
+    case "stuck":
+    case "timeout":
       return "buzz";
     case "charged":
       return "coin";

@@ -13,6 +13,11 @@ type Step struct {
 	StartToCloseMs int
 	HeartbeatMs    int
 	Retry          orders.RetrySpec
+
+	// Idioms scenes (101-108).
+	CourierWaitMs     int  // workflow waits this long for the courier before delivering
+	ScheduleToCloseMs int  // overall activity deadline (0 = none)
+	Scene             bool // true for idioms scenes
 }
 
 var defaultRetry = orders.RetrySpec{InitialMs: 1000, Coefficient: 2, MaxMs: 8000, MaxAttempts: 0}
@@ -27,6 +32,25 @@ var all = map[int]Step{
 	4: {ID: 4, Live: true, ActivityMs: 500, EveryMs: [2]int{3500, 5000}, StartToCloseMs: 10000, HeartbeatMs: 2000, Retry: defaultRetry},
 	// Pause & resume.
 	5: {ID: 5, Live: true, ActivityMs: 1200, EveryMs: [2]int{6000, 8000}, StartToCloseMs: 10000, HeartbeatMs: 2000, Retry: defaultRetry},
+}
+
+func scene(id int, mod func(*Step)) Step {
+	s := Step{ID: id, Live: true, Scene: true, ActivityMs: 1200, EveryMs: [2]int{6000, 8000}, StartToCloseMs: 10000, HeartbeatMs: 2000, Retry: defaultRetry}
+	if mod != nil {
+		mod(&s)
+	}
+	return s
+}
+
+func init() {
+	all[101] = scene(101, func(s *Step) { s.CourierWaitMs = 4000 })
+	all[102] = scene(102, func(s *Step) { s.CourierWaitMs = 4000 })
+	all[103] = scene(103, nil)
+	all[104] = scene(104, nil)
+	all[105] = scene(105, func(s *Step) { s.CourierWaitMs = 6000 })
+	all[106] = scene(106, func(s *Step) { s.StartToCloseMs = 3000; s.ScheduleToCloseMs = 12000 })
+	all[107] = scene(107, func(s *Step) { s.ActivityMs = 800; s.EveryMs = [2]int{2500, 3500} })
+	all[108] = scene(108, func(s *Step) { s.ActivityMs = 2000; s.CourierWaitMs = 5000 })
 }
 
 // Get returns the config for a step, falling back to step 1.

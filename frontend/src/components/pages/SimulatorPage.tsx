@@ -1,38 +1,53 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tag } from "@/components/atoms";
 import { PlayButton, SpeedSlider } from "@/components/molecules";
 import { BannerLine, Board, ConnectionNotice, OrdersPanel, StepNav, Toolbox, TryThis, WorkersPanel } from "@/components/organisms";
 import { ArenaTemplate } from "@/components/templates/ArenaTemplate";
+import { bubbleVisible, type Bubble } from "@/lib/bubble";
 import { api } from "@/lib/live/api";
 import { emptyLiveView, liveView } from "@/lib/live/toView";
 import { useLive } from "@/lib/live/useLive";
 import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
-import { STEPS, getStep, stepAccent } from "@/lib/steps";
+import { neighbours, sectionOf, stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
 import { useFx } from "@/lib/fx/useFx";
 import { useSound } from "@/lib/fx/sound";
-import type { ActionId, ArenaView, NodeId, SchedMode, ToolId } from "@/lib/types";
+import type { ActionId, ArenaView, NodeId, SchedMode, Tone, ToolId } from "@/lib/types";
 import { useFrameLoop } from "@/lib/useFrameLoop";
 import { SPEED_STOPS, nudgeSpeed, setSpeed, useSpeed } from "@/lib/speed";
 import styles from "./SimulatorPage.module.css";
 
 const BANNER_MS = 7000;
+const PARCEL_TOOLS: ToolId[] = ["select", "error", "signal", "query", "update", "cancel"];
 
-export function SimulatorPage({ stepId }: { stepId: number }) {
-  const step = getStep(stepId) ?? STEPS[0];
+export function SimulatorPage({ config }: { config: StepConfig }) {
+  const step = config;
   const router = useRouter();
   const [tool, setTool] = useState<ToolId>(step.tools[0]);
+  const [section, setSection] = useState<string | undefined>(step.sections?.[0]?.id);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [errorMode, setErrorMode] = useState<"500" | "declined">("500");
+  const [bubble, setBubble] = useState<Bubble | null>(null);
+  // Replies to parcel clicks: a counter drops a slow earlier reply that arrives after a newer one.
+  const sentSeq = useRef(0);
+  const shownSeq = useRef(0);
   const [frozen, setFrozen] = useState(false);
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
   // Act 1: one simulation per step (the page is keyed by step); Reset swaps it.
-  const newSim = () => (step.live ? null : new QueueSim({ score: step.score, hub: step.hub }));
+  // Act 1 starts playing so the board is never empty on stage; Reset starts a fresh playing sim.
+  const newSim = () => {
+    if (step.live) return null;
+    const s = new QueueSim({ score: step.score, hub: step.hub });
+    s.setRunning(true);
+    return s;
+  };
   const [sim, setSim] = useState<QueueSim | null>(newSim);
 
   // Act 2: live snapshots from the Go controller (real Temporal).
@@ -60,6 +75,11 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     view = liveView(live.snapshot, step, serverNow, live.connected);
   } else view = emptyLiveView(step, live.connected);
 
+  const nowRef = useRef(now);
+  useEffect(() => {
+    nowRef.current = now;
+  });
+
   const dots = place(view.dots, now, speed);
   // Act 1 swaps the sim object on Reset; live steps count resets.
   // Effects start fresh (nothing fires for state already on screen) after Reset, when
@@ -78,8 +98,37 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
   if (view.banner.seq !== banner.seq && view.banner.text) setBanner({ seq: view.banner.seq, at: now });
   const bannerText = view.banner.text && now - banner.at < BANNER_MS ? view.banner.text : "";
 
+  // Last placed position of each parcel, so a reply can still anchor where a vanished parcel was.
+  const [lastPos] = useState(() => new Map<string, { x: number; y: number }>());
+  useEffect(() => {
+    for (const d of dots) lastPos.set(d.dot.id, { x: d.x, y: d.y });
+  });
+
+  let bubbleAt: { x: number; y: number; text: string; tone: Tone } | null = null;
+  if (bubble && bubbleVisible(bubble, now)) {
+    const p = dots.find((d) => d.dot.id === bubble.orderId) ?? lastPos.get(bubble.orderId);
+    if (p) bubbleAt = { x: p.x, y: p.y, text: bubble.text, tone: bubble.tone };
+  }
+
   const hit = (node: NodeId) => {
     fx.tap(node);
+    if (node.startsWith("o:")) {
+      if (!step.live) return;
+      const id = node.slice(2);
+      if (tool === "select") {
+        setSelected(id);
+        return;
+      }
+      const op = tool === "error" ? "inject" : tool;
+      if (op !== "inject" && op !== "signal" && op !== "query" && op !== "update" && op !== "cancel") return;
+      const seq = ++sentSeq.current;
+      void api.order(id, op, op === "inject" ? errorMode : undefined).then((r) => {
+        if (seq < shownSeq.current) return;
+        shownSeq.current = seq;
+        setBubble({ orderId: id, text: r.text, tone: r.tone, at: nowRef.current });
+      });
+      return;
+    }
     if (!step.live) {
       sim?.hit(node, tool);
       return;
@@ -87,6 +136,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     if (node.startsWith("w:")) {
       const id = Number(node.slice(2));
       if (tool === "hammer") void api.hammerWorker(id);
+      else if (tool === "freeze") void api.freeze(id);
       else if (tool === "pause") {
         const o = live.snapshot?.orders.find((x) => x.worker === id && x.status === "running");
         if (o) void api.pause(o.id);
@@ -94,7 +144,14 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     } else if (node === "hub" && tool === "hammer") void api.hammerTemporal();
   };
 
+  /** A hotkey (or click) on a button in another tab brings that tab forward. */
+  const reveal = (item: ToolId | ActionId) => {
+    const s = sectionOf(step, item);
+    if (s) setSection(s);
+  };
+
   const action = (a: ActionId) => {
+    reveal(a);
     if (a === "reset") {
       setResetCount((n) => n + 1);
       if (step.live) void api.step(step.id, true);
@@ -103,11 +160,20 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     }
     if (!step.live) {
       if (a === "flood") sim?.flood();
+      else if (a === "payDown") sim?.payments("down");
+      else if (a === "paySlow") sim?.payments("slow");
+      else if (a === "declined") sim?.payments("declined");
+      else if (a === "ackMode") sim?.toggleAckMode();
+      else if (a === "dlq") sim?.toggleDlq();
+      else if (a === "replayDlq") sim?.replayAll();
+      else if (a === "bulkJob") sim?.bulkJob();
+      else if (a === "pauseAll") sim?.pauseAll();
       return;
     }
     if (a === "flood" || a === "bulk" || a === "declined") void api.load(a);
     else if (a === "payDown") void api.payments("down");
     else if (a === "paySlow") void api.payments("slow");
+    else if (a === "payDownLong") void api.payments("downLong");
     else if (a === "hammerAll") void api.hammerWorkers();
     else if (a === "pauseAll") void api.pause();
     else if (a === "resumeAll") void api.resume();
@@ -115,7 +181,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
 
   const setSched = (m: SchedMode) => void api.sched(m);
 
-  // Play / pause: clients only place orders while playing. Every step loads paused.
+  // Play / pause: clients only place orders while playing. Live steps load paused; Act 1 autoplays.
   const playing = step.live ? Boolean(live.snapshot?.running) : Boolean(sim?.running);
   const togglePlay = () => {
     if (step.live) void api.run(!playing);
@@ -129,18 +195,46 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
       if (e.target instanceof HTMLInputElement) return; // e.g. arrow keys on the speed slider
       const k = e.key.toLowerCase();
       const has = (a: ActionId) => step.actions.includes(a);
-      if (e.key === "Escape") router.push("/");
-      else if (e.key === "ArrowRight" && step.id < STEPS.length) router.push(`/${step.id + 1}`);
-      else if (e.key === "ArrowLeft" && step.id > 1) router.push(`/${step.id - 1}`);
-      else if (k === "h" && step.tools.includes("hammer")) setTool("hammer");
+      const nav = neighbours(step);
+      const pick = (t: ToolId) => step.tools.includes(t) && (setTool(t), true);
+      if (e.key === "Escape") {
+        if (selected) setSelected(null);
+        else router.push("/");
+      }
+      else if (e.key === "ArrowRight" && nav.next) router.push(nav.next);
+      else if (e.key === "ArrowLeft" && nav.prev) router.push(nav.prev);
+      else if (k === "e" && step.tools.includes("error")) {
+        if (tool === "error") setErrorMode((m) => (m === "500" ? "declined" : "500"));
+        else setTool("error");
+      } else if (k === "v" && pick("select")) {
+        /* picked */
+      } else if (k === "g" && pick("signal")) {
+        /* picked */
+      } else if (k === "q" && pick("query")) {
+        /* picked */
+      } else if (k === "u" && pick("update")) {
+        /* picked */
+      } else if (k === "x" && pick("cancel")) {
+        /* picked */
+      } else if (k === "c" && pick("freeze")) {
+        /* picked */
+      } else if (k === "h" && step.tools.includes("hammer")) {
+        setTool("hammer");
+        reveal("hammer");
+      }
       else if (k === "z" && has("payDown")) action("payDown");
       else if (k === "s" && has("paySlow")) action("paySlow");
+      else if (k === "l" && has("payDownLong")) action("payDownLong");
       else if (k === "p" && step.tools.includes("pause")) setTool("pause");
       else if (k === "f") {
         if (has("bulk")) action("bulk");
         else if (has("flood")) action("flood");
       } else if (k === "a" && has("hammerAll")) action("hammerAll");
       else if (k === "d" && has("declined")) action("declined");
+      else if (k === "k" && has("ackMode")) action("ackMode");
+      else if (k === "q" && has("dlq")) action("dlq");
+      else if (k === "y" && has("replayDlq")) action("replayDlq");
+      else if (k === "b" && has("bulkJob")) action("bulkJob");
       else if (k === "r") action("reset");
       else if (k === "m") sound.toggle();
       else if (e.key === "-" || e.key === "_") nudgeSpeed(-1);
@@ -158,7 +252,7 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
     <ArenaTemplate
       accent={stepAccent(step.id)}
       backdrop={<SceneBackdrop variant={step.act === 1 ? "shed" : "depot"} />}
-      url={<StepNav current={step.id} />}
+      url={<StepNav config={step} />}
       title={step.name}
       tag={<Tag tone={step.act === 1 ? "bad" : "good"}>{step.act === 1 ? "Without Temporal" : "Real Temporal"}</Tag>}
       extra={
@@ -180,6 +274,11 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           tool={tool}
           sched={view.sched}
           payments={view.payments}
+          ackAfter={view.ackAfter}
+          dlqOn={view.dlqOn}
+          dlqParked={view.side?.kind === "dlq" ? view.side.count : 0}
+          section={section}
+          onSection={setSection}
           frozen={frozen}
           onTool={setTool}
           onAction={action}
@@ -187,18 +286,25 @@ export function SimulatorPage({ stepId }: { stepId: number }) {
           onFreeze={() => setFrozen((f) => !f)}
           muted={sound.muted}
           onSound={sound.toggle}
+          scene={view.scene}
+          onSwitch={(s) => void api.scene(s)}
+          errorMode={tool === "error" || step.tools.includes("error") ? errorMode : undefined}
         />
       }
       left={<WorkersPanel panels={view.panels} />}
       board={
         <ToolCursor tool={tool}>
-          <Board view={view} dots={dots} onHit={hit} onResume={(id) => void api.resume(id)} shake={fx.shake} />
+          <Board view={view} dots={dots} onHit={hit} onResume={(id) => (step.live ? void api.resume(id) : sim?.replay(id))} shake={fx.shake} parcelTool={step.live && PARCEL_TOOLS.includes(tool)} selected={selected} bubble={bubbleAt} />
           <FxCanvas effects={fx.effects} shake={fx.shake} ambient={step.act === 1 ? "shed" : "depot"} resetKey={fxResetKey} />
         </ToolCursor>
       }
-      overlay={step.live && !view.connected ? <ConnectionNotice /> : undefined}
+      overlay={
+        <>
+          {step.live && !view.connected && <ConnectionNotice />}
+        </>
+      }
       right={<OrdersPanel panels={view.panels} />}
-      caption={<TryThis text={step.tryThis} />}
+      caption={<TryThis lines={tryThisLines(step)} />}
       banner={<BannerLine text={bannerText} />}
     />
   );

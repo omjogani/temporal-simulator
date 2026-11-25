@@ -46,7 +46,7 @@ export function useFx() {
       shake: reduced ? { x: 0, y: 0 } : shakeOffset(s.effects, now),
       takeEvents: () => s.events.splice(0),
       tap: (node) => {
-        const at = nodeAnchor(node);
+        const at = nodeAnchor(node, placed);
         if (at) s.effects.push(tapAt(at, s.now));
       },
     };

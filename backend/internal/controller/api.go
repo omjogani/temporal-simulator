@@ -28,6 +28,34 @@ func (c *Controller) routes() http.Handler {
 		c.SetStep(b.Step, b.Force)
 		writeJSON(w, map[string]int{"step": b.Step})
 	})
+	mux.HandleFunc("POST /api/scene", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			IdemKey *bool   `json:"idemKey"`
+			Build   *string `json:"build"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		c.SetScene(b.IdemKey, b.Build)
+		writeJSON(w, map[string]bool{"ok": true})
+	})
+	mux.HandleFunc("POST /api/order", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			ID  string `json:"id"`
+			Op  string `json:"op"`
+			Arg string `json:"arg"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		writeJSON(w, c.OrderOp(r.Context(), b.ID, b.Op, b.Arg))
+	})
+	mux.HandleFunc("GET /internal/deploy", func(w http.ResponseWriter, _ *http.Request) {
+		c.mu.Lock()
+		build := c.build
+		c.mu.Unlock()
+		writeJSON(w, map[string]string{"build": build})
+	})
 	mux.HandleFunc("POST /api/hammer", func(w http.ResponseWriter, r *http.Request) {
 		var b struct {
 			Target string `json:"target"` // worker | workers | temporal
@@ -46,6 +74,16 @@ func (c *Controller) routes() http.Handler {
 		}
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /api/freeze", func(w http.ResponseWriter, r *http.Request) {
+		var b struct {
+			Worker int `json:"worker"`
+		}
+		if !decode(w, r, &b) {
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": c.freezeWorker(b.Worker)})
+	})
+	mux.HandleFunc("GET /api/history", c.handleHistory)
 	mux.HandleFunc("POST /api/payments", func(w http.ResponseWriter, r *http.Request) {
 		var b struct {
 			Mode string `json:"mode"`

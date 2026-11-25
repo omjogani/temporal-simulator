@@ -28,6 +28,12 @@ describe("anchor / nodeAnchor", () => {
     expect(nodeAnchor("side")).toEqual({ x: SIDE.x, y: SIDE.y });
     expect(nodeAnchor("c:0")).toEqual({ x: CLIENTS[0].x, y: CLIENTS[0].y });
   });
+
+  test("nodeAnchor for a parcel is its placed position, or nowhere", () => {
+    expect(nodeAnchor("o:a", placed)).toEqual({ x: 412, y: 233 });
+    expect(nodeAnchor("o:zz", placed)).toBeNull();
+    expect(nodeAnchor("o:a")).toBeNull();
+  });
 });
 
 describe("spawn", () => {
@@ -60,6 +66,15 @@ describe("spawn", () => {
     expect(one({ kind: "charged", id: "a", client: 0 })).toEqual(["coin", "var(--c-gold)"]);
     expect(one({ kind: "duplicate", id: "a", client: 0 })).toEqual(["spark", "var(--c-fault)"]);
     expect(one({ kind: "retry", id: "a", client: 0 })).toEqual(["spark", "var(--c-gold)"]);
+  });
+
+  test("idiom events", () => {
+    const k = (ev: FxEvent) => spawn(ev, at, 0).map((e) => [e.kind, e.color, e.text]);
+    expect(k({ kind: "orderCanceled", id: "a", client: 0 })).toEqual([["poof", "var(--c-dim)", undefined]]);
+    expect(k({ kind: "stuck", id: "a", client: 0 })).toEqual([["shake", "", undefined], ["spark", "var(--c-fault)", undefined]]);
+    expect(k({ kind: "replayed", worker: 1 })).toEqual([["label", "var(--c-gold)", "↻"]]);
+    expect(k({ kind: "timeout", id: "a", client: 0, tag: "heartbeat ⏱" })).toEqual([["label", "var(--c-gold)", "heartbeat ⏱"]]);
+    expect(anchor({ kind: "replayed", worker: 2 }, [])).not.toBeNull();
   });
 
   test("bornAt, ttl and unique ids", () => {

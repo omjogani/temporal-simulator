@@ -14,7 +14,7 @@ The talk has two acts, one URL per step:
 | Route | Act | Topic | Backed by |
 |---|---|---|---|
 | `/` | | Scenario menu: one cartridge per step | |
-| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost | In-browser illustration |
+| `/1` | Without Temporal | Plain queue (in-memory, auto-ack): orders lost; Payments faults, ack-after-processing duplicates, dead-letter queue, bulk job blocking FIFO, pause-all | In-browser illustration |
 | `/2` | Temporal | Durability: kill workers / kill Temporal for 10 s, nothing lost | **Real Temporal** |
 | `/3` | Temporal | Timeouts and retry policy, non-retryable errors, compensation | **Real Temporal** |
 | `/4` | Temporal | Task queue priority and fairness | **Real Temporal** |
@@ -35,13 +35,13 @@ temporal/dynamicconfig.yaml  priority + fairness switches for the server
 backend/                  Go module (single binary `sim`)
   cmd/sim/                entrypoint: `sim controller` and `sim worker --id N`
   internal/orders/        workflow, activities, shared types (task queue "orders")
-  internal/steps/         per-step config for the live steps (2-5)
+  internal/steps/         per-step config for the live steps (2-5) and the older idiom scenes (101-108, backend only)
   internal/controller/    HTTP + WebSocket API, worker container manager, docker hammer,
                           fake Payments API, client load generator, state registry
 frontend/                 Next.js (App Router, TypeScript), atomic design
   src/components/atoms|molecules|organisms|templates
   src/app/[step]/         one route per step
-  src/lib/                step configs, board geometry, Act 1 simulation, live adapter
+  src/lib/                step configs, board geometry, Act 1 simulation, live adapter;
   src/lib/fx/             effects from diffing ArenaViews (events, effects, particles), sound
   src/lib/pets.ts         the four worker pets and their poses
 ```
@@ -67,6 +67,43 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 - The controller hosts a fake Payments API with fault switches (down = 500s, slow = 5 s,
   declined card = 402 non-retryable). It dedups by idempotency key (the workflow ID).
 - The browser gets one state snapshot about 10 times a second over `ws://localhost:18080/ws`.
+
+## How step 1 works
+
+- `frontend/src/lib/sim/engine.ts` (`QueueSim`) is a seeded, clock-free simulation; tests tick it
+  (`engine.test.ts`). It is the counterpart to steps 2-5 so the presenter can flip between them:
+  Payments down/slow/declined (step 3), ack-after-processing with redelivery and a Dup counter
+  (step 2), a dead-letter queue that parks failed orders (shown in the side shelf; clicking a chip or
+  Replay DLQ re-runs the order from its first step, so Reserve stock runs twice; nothing refunds or
+  releases stock; it survives a queue crash), a bulk job that makes every other order wait in FIFO (step 4), and pause-all, which can only
+  stop the consumers and drops or strands their orders (step 5).
+- The step 1 toolbox has tabs (`sections` in `lib/steps.ts`): Crashes, Payments, Load. Only the active
+  tab's buttons show; every hotkey still works and switches to its tab. Replay DLQ only shows once
+  something is parked. Steps 2-5 have no tabs.
+- Act 1 starts playing on load and on Reset. `tryThis` can be a list of numbered beats.
+
+## Idioms backend (no frontend)
+
+The `/idioms` pages were removed from the frontend; the controller still serves the scene
+support below, unused by the UI. Remove it too if it gets in the way.
+
+- Scenes run as controller steps 101-108 (`/idioms/N` sets step `100+N`) on the same
+  `OrderWorkflow`, extended with a `giftWrap` signal, a `changeAddress` update (validator
+  rejects once Ship is recorded), cancellation cleanup and an optional courier-wait timer.
+- Workers report real replays (`workflow.IsReplaying`) to the controller; the board shows a
+  replay sweep only when one happened.
+- Determinism (scene 5): workers read the deployed build (`good` | `bad`) from
+  `GET /internal/deploy` at boot; deploying restarts `worker-*`. The `bad` build calls
+  `time.Now()` on purpose and is the only non-deterministic workflow code allowed.
+- Endpoints added for the idioms:
+  - `POST /api/scene` `{idemKey?, build?}`: idempotency-key switch and build deploy.
+  - `POST /api/order` `{id, op, arg}`, op = `signal` | `query` | `update` | `cancel` |
+    `inject` (arg `500` or `declined`): returns the real reply `{ok, text, tone}`.
+  - `POST /api/freeze` `{worker}`: `docker pause` one worker (heartbeat timeout), then unpause.
+  - `GET /api/history?id=<workflowId>`: trimmed event history for the history strip.
+  - `POST /api/payments` also takes `downLong` (500s for 20 s, schedule-to-close).
+- The snapshot also carries task queue pollers and backlog, the deployed build, replay
+  events, timeouts and stuck workflow tasks.
 
 ## Ports and the other local Temporal
 
@@ -121,11 +158,14 @@ cd frontend && pnpm test && pnpm lint && pnpm build
   (impacts, confetti, coins, sparks, dust) are drawn by one PixiJS canvas over the board
   (`FxCanvas`). Effects come from diffing consecutive `ArenaView`s (`src/lib/fx/events.ts`),
   never from extra backend fields. Keys: ← → steps, `Esc` menu, `H` `P` tools, `F` `A` `Z` `S`
-  `D` actions, `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
+  `D` actions, `K` ack mode, `Q` dead-letter queue, `Y` replay DLQ and `B` bulk job (step 1 only), `R` reset, `-` `+` speed, Space play/pause, `M` sound (muted by default).
+  Other tools and actions: `V` select, `E` error, `G` signal, `Q` query, `U` update, `X` cancel,
+  `C` freeze, and `L` payments down 20 s.
 - **Presentation-first UI:** the screen is projected during a talk. Keep side panels minimal,
   numbers large, colours meaningful (gold = charged / retrying, red = lost / duplicate,
   green = done). Don't add dense debug info to the main view.
 - **Backend:** standard library HTTP, `go.temporal.io/sdk`, `github.com/coder/websocket`.
-  Keep workflow code deterministic; all I/O goes in activities.
+  Keep workflow code deterministic (except the deliberate `bad` build of idioms scene 5);
+  all I/O goes in activities.
 - **Honesty:** if the UI claims something about Temporal, it must match real Temporal
   semantics (at-least-once activities, retries handed to any healthy worker, etc.).

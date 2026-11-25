@@ -31,6 +31,9 @@ func (a *Activities) ChargeCard(ctx context.Context, in OrderInput) (StepResult,
 func (a *Activities) ShipOrder(ctx context.Context, in OrderInput) (StepResult, error) {
 	return a.run(ctx, in, 2)
 }
+func (a *Activities) ShipExpress(ctx context.Context, in OrderInput) (StepResult, error) {
+	return a.run(ctx, in, ShipStep)
+}
 func (a *Activities) SendEmail(ctx context.Context, in OrderInput) (StepResult, error) {
 	return a.run(ctx, in, 3)
 }
@@ -115,7 +118,9 @@ func (a *Activities) charge(ctx context.Context, in OrderInput) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	// The workflow ID makes retries safe: Payments charges each order at most once.
-	req.Header.Set("Idempotency-Key", in.OrderID)
+	if !in.NoIdempotencyKey {
+		req.Header.Set("Idempotency-Key", in.OrderID)
+	}
 	resp, err := a.HTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("payments unreachable: %w", err)

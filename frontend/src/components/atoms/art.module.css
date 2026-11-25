@@ -1,5 +1,16 @@
 /* Keyframes for board art: lamps, belts, parcels, pets. Reduced motion is handled in globals.css. */
 
+/* Pulsing red ring around a parcel that is stuck. */
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.18); }
+}
+
 /* Retry ring around a parcel waiting for its next attempt. */
 .spin {
   transform-box: fill-box;
@@ -98,4 +109,13 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+/* Worker long-poll toward the hub: dashes travel up the wire. */
+.poll {
+  animation: poll 0.9s linear infinite;
+}
+@keyframes poll {
+  from { stroke-dashoffset: 16; }
+  to { stroke-dashoffset: 0; }
 }

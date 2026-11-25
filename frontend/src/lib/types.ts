@@ -3,7 +3,7 @@
 
 export type Tone = "neutral" | "good" | "bad" | "gold" | "dim";
 
-export type ToolId = "hammer" | "pause";
+export type ToolId = "hammer" | "pause" | "select" | "error" | "signal" | "query" | "update" | "cancel" | "freeze";
 export type ActionId =
   | "flood"
   | "bulk"
@@ -11,12 +11,17 @@ export type ActionId =
   | "declined"
   | "payDown"
   | "paySlow"
+  | "payDownLong"
   | "pauseAll"
+  | "ackMode"
+  | "dlq"
+  | "replayDlq"
+  | "bulkJob"
   | "resumeAll"
   | "reset";
 export type SchedMode = "fifo" | "priority" | "fair";
-export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}`;
-export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused";
+export type NodeId = "hub" | "side" | `w:${number}` | `c:${number}` | `o:${string}`;
+export type ScoreKey = "done" | "inflight" | "lost" | "dup" | "failed" | "paused" | "canceled" | "dlq";
 
 export type RowState =
   | "placeholder"
@@ -51,6 +56,11 @@ export interface WorkerCardView {
   footer: string;
   /** Docker container name, on live steps where the worker really runs in Docker. */
   container?: string;
+  /** Last workflow rebuilt from history on this worker, shown for a few seconds. */
+  replayed?: { events: number; ago: number };
+  frozen?: boolean;
+  /** Temporal lists this worker as polling the task queue. */
+  polling?: boolean;
 }
 
 export type Loc =
@@ -60,18 +70,21 @@ export type Loc =
   | { kind: "side"; slot: number }
   | { kind: "gone" };
 
-export type Ring = "none" | "charged" | "dup" | "ghost" | "done" | "failed" | "retry";
+export type Ring = "none" | "charged" | "dup" | "ghost" | "done" | "failed" | "retry" | "stuck";
 
 export interface DotView {
   id: string;
   client: number; // 0-based
   loc: Loc;
   ring: Ring;
-  fate?: "done" | "lost" | "failed";
+  fate?: "done" | "lost" | "failed" | "canceled";
   declined?: boolean;
   ghost?: boolean;
   hidden?: boolean;
   label?: string; // small text next to the dot (e.g. retry countdown)
+  bow?: boolean; // gift-wrapped order
+  stamp?: "stuck";
+  tag?: string; // e.g. "heartbeat ⏱"
 }
 
 export interface HubView {
@@ -98,7 +111,7 @@ export interface ShelfChip {
 }
 
 export interface SideView {
-  kind: "paused";
+  kind: "paused" | "dlq";
   count: number;
   chips: ShelfChip[];
 }
@@ -151,7 +164,13 @@ export interface ArenaView {
   banner: { seq: number; text: string };
   connected: boolean;
   sched: SchedMode;
+  /** Act 1 only: the plain queue acks after processing (redelivers on a crash). */
+  ackAfter?: boolean;
+  /** Act 1 only: the plain queue has a dead-letter queue. */
+  dlqOn?: boolean;
   temporalUi?: string;
+  queue?: { pollers: number[]; backlog: number };
+  scene?: { idemKey: boolean; build: "good" | "bad" };
 }
 
 export interface ArenaControls {

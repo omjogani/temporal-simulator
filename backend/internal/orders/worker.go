@@ -2,6 +2,8 @@ package orders
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -23,6 +25,13 @@ func RunWorker(id int, hostPort, controllerURL string) error {
 	}
 	defer c.Close()
 
+	fetchBuild(controllerURL)
+
+	emitter := &Activities{WorkerID: id, ControllerURL: controllerURL, HTTP: &http.Client{Timeout: 30 * time.Second}}
+	ReplayHook = func(workflowID string, events int64) {
+		emitter.emit(Event{Type: "replayed", WorkflowID: workflowID, Worker: id, Events: events})
+	}
+
 	w := worker.New(c, TaskQueue, worker.Options{
 		Identity:                           identity,
 		MaxConcurrentActivityExecutionSize: 1,
@@ -36,6 +45,26 @@ func RunWorker(id int, hostPort, controllerURL string) error {
 		HTTP:          &http.Client{Timeout: 30 * time.Second},
 	})
 	return w.Run(stopCh())
+}
+
+// fetchBuild asks the controller which build to run. On error it keeps "good".
+func fetchBuild(controllerURL string) {
+	hc := &http.Client{Timeout: 2 * time.Second}
+	resp, err := hc.Get(controllerURL + "/internal/deploy")
+	if err != nil {
+		log.Printf("deploy: %v (keeping %s build)", err, Build)
+		return
+	}
+	defer resp.Body.Close()
+	var d struct {
+		Build string `json:"build"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil || (d.Build != "good" && d.Build != "bad") {
+		log.Printf("deploy: bad response (keeping %s build): %v", Build, err)
+		return
+	}
+	Build = d.Build
+	log.Printf("deploy: running the %s build", Build)
 }
 
 // stopCh closes on SIGINT/SIGTERM or when the controller (our parent) dies,

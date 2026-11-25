@@ -30,8 +30,9 @@ const (
 	osFinishing   = "finishing"   // last step done, workflow closing
 	osPaused      = "paused"
 	osCompleted   = "completed"
-	osFailed      = "failed" // declined card, compensated
-	osLost        = "lost"   // closed unexpectedly (should never happen)
+	osFailed      = "failed"   // declined card, compensated
+	osLost        = "lost"     // closed unexpectedly (should never happen)
+	osCanceled    = "canceled" // cancellation requested, cleanup ran
 )
 
 // StepView is one row of the to-do list.
@@ -58,6 +59,12 @@ type Order struct {
 	Charged        int        `json:"charged"`
 	PauseRequested bool       `json:"pauseRequested"`
 	EndedAt        int64      `json:"endedAt,omitempty"`
+	GiftWrap       bool       `json:"giftWrap"`
+	Address        string     `json:"address"`
+	WaitUntil      int64      `json:"waitUntil"`
+	Express        bool       `json:"express"`
+	Timeout        string     `json:"timeout"`
+	Stuck          string     `json:"stuck"`
 
 	readyAt   time.Time
 	createdAt time.Time
@@ -73,7 +80,7 @@ func newOrder(id string, num, client int, declined bool) *Order {
 }
 
 func (o *Order) terminal() bool {
-	return o.Status == osCompleted || o.Status == osFailed || o.Status == osLost
+	return o.Status == osCompleted || o.Status == osFailed || o.Status == osLost || o.Status == osCanceled
 }
 
 func (o *Order) ensureCompensation() {
@@ -117,6 +124,14 @@ type Snapshot struct {
 	Speed          float64          `json:"speed"`
 	Running        bool             `json:"running"` // clients are placing orders (the ▶ Play button)
 	TemporalUI     string           `json:"temporalUi"`
+	Scene          SceneView        `json:"scene"`
+	Queue          QueueView        `json:"queue"`
+}
+
+// SceneView carries the idioms scene switches.
+type SceneView struct {
+	IdemKey bool   `json:"idemKey"`
+	Build   string `json:"build"`
 }
 
 type TemporalView struct {
@@ -128,7 +143,12 @@ type WorkerView struct {
 	ID        int   `json:"id"`
 	Up        bool  `json:"up"`
 	DownUntil int64 `json:"downUntil"`
+	Frozen    bool  `json:"frozen"`
 	Completed int   `json:"completed"`
+	// ReplayedAt is when this worker last rebuilt a workflow from history (unix ms),
+	// ReplayedEvents how many history events that replay read.
+	ReplayedAt     int64 `json:"replayedAt"`
+	ReplayedEvents int64 `json:"replayedEvents"`
 }
 
 type PaymentsView struct {
@@ -143,6 +163,7 @@ type StatsView struct {
 	Done       int `json:"done"`
 	Failed     int `json:"failed"`
 	Lost       int `json:"lost"`
+	Canceled   int `json:"canceled"`
 	Duplicates int `json:"duplicates"`
 	Inflight   int `json:"inflight"`
 	Paused     int `json:"paused"`

@@ -1,11 +1,20 @@
 import { Parcel } from "@/components/atoms/Parcel";
-import { Wire } from "@/components/atoms/svg";
-import { VIEW, clientWire, sideWire, workerWire } from "@/lib/geometry";
+import { SvgText, Wire } from "@/components/atoms/svg";
+import { HUB, VIEW, clientWire, sideWire, workerWire } from "@/lib/geometry";
 import type { XY } from "@/lib/fx/effects";
 import type { PlacedDot } from "@/lib/motion/useDotMotion";
-import type { ArenaView, NodeId } from "@/lib/types";
-import { ClientNode, HubNode, SideNode, WorkerCard } from "./nodes";
+import { SpeechBubble } from "@/components/molecules/SpeechBubble";
+import type { ArenaView, NodeId, Tone } from "@/lib/types";
+import { ClientNode, Hit, HubNode, SideNode, WorkerCard } from "./nodes";
+import art from "@/components/atoms/art.module.css";
 import styles from "./board.module.css";
+
+/** A poll runs from the worker up to the hub (the reverse of the order wire). */
+const pollPath = (worker: number) =>
+  [...workerWire(worker)]
+    .reverse()
+    .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join("");
 
 interface Props {
   view: ArenaView;
@@ -14,10 +23,17 @@ interface Props {
   onResume: (orderId: string) => void;
   /** Screen-shake offset in board units. */
   shake?: XY;
+  /** Parcels are clickable (the current tool acts on a parcel). */
+  parcelTool?: boolean;
+  selected?: string | null;
+  /** Draw the workers' long polls to the hub (idiom scene 107, when the snapshot has queue data). */
+  pollArrows?: boolean;
+  /** Reply to the presenter's last click on a parcel, in board units. */
+  bubble?: { x: number; y: number; text: string; tone: Tone } | null;
 }
 
 /** The whole arena drawing: wires, nodes, worker cards, moving orders. */
-export function Board({ view, dots, onHit, onResume, shake }: Props) {
+export function Board({ view, dots, onHit, onResume, shake, parcelTool, selected, pollArrows, bubble }: Props) {
   return (
     <svg className={styles.svg} viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} role="group" aria-label="Clients, hub and workers with orders moving between them">
       <g transform={shake && (shake.x || shake.y) ? `translate(${shake.x.toFixed(2)} ${shake.y.toFixed(2)})` : undefined}>
@@ -31,6 +47,24 @@ export function Board({ view, dots, onHit, onResume, shake }: Props) {
         {view.side && <Wire pts={sideWire()} moving={view.hub.up} />}
       </g>
 
+      {pollArrows && view.queue && (
+        <g pointerEvents="none">
+          <SvgText x={HUB.x + HUB.w / 2 + 16} y={HUB.y + 6} size={34} weight={800} tone={view.queue.backlog > 0 ? "gold" : "dim"}>
+            {String(view.queue.backlog)}
+          </SvgText>
+          <SvgText x={HUB.x + HUB.w / 2 + 16} y={HUB.y + 24} size={10} tone="dim" letterSpacing={1}>
+            WAITING
+          </SvgText>
+        </g>
+      )}
+      {pollArrows && view.queue && (
+        <g fill="none" strokeLinecap="round" pointerEvents="none">
+          {view.queue.pollers.map((id) => (
+            <path key={id} d={pollPath(id)} strokeWidth={3} strokeDasharray="7 9" className={art.poll} style={{ stroke: "var(--c-ok)" }} />
+          ))}
+        </g>
+      )}
+
       {[0, 1, 2, 3].map((i) => (
         <ClientNode key={i} index={i} wide={view.hub.lanes} onHit={onHit} />
       ))}
@@ -40,22 +74,36 @@ export function Board({ view, dots, onHit, onResume, shake }: Props) {
         <WorkerCard key={w.id} card={w} onHit={onHit} />
       ))}
 
-      <g pointerEvents="none">
-        {dots.map(({ dot, x, y, opacity }) => (
-          <Parcel
-            key={dot.id}
-            x={x}
-            y={y}
-            client={dot.client}
-            ring={dot.ring}
-            opacity={opacity}
-            ghost={dot.ghost}
-            declined={dot.declined}
-            lost={dot.fate === "lost"}
-            label={dot.label}
-          />
-        ))}
+      <g pointerEvents={parcelTool ? undefined : "none"}>
+        {dots.map(({ dot, x, y, opacity }) => {
+          const parcel = (
+            <Parcel
+              key={dot.id}
+              x={x}
+              y={y}
+              client={dot.client}
+              ring={dot.ring}
+              opacity={opacity}
+              ghost={dot.ghost}
+              declined={dot.declined}
+              lost={dot.fate === "lost"}
+              canceled={dot.fate === "canceled"}
+              label={dot.label}
+              bow={dot.bow}
+              tag={dot.tag}
+              selected={selected === dot.id}
+            />
+          );
+          if (!parcelTool || dot.hidden) return parcel;
+          return (
+            <Hit key={dot.id} node={`o:${dot.id}`} label={`Order ${dot.id}`} onHit={onHit}>
+              <circle cx={x} cy={y} r={14} fill="transparent" />
+              {parcel}
+            </Hit>
+          );
+        })}
       </g>
+      {bubble && <SpeechBubble {...bubble} />}
       </g>
     </svg>
   );

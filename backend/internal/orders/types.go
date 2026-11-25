@@ -21,6 +21,12 @@ const (
 	SignalResume  = "resume"
 	QueryProgress = "progress"
 
+	SignalGiftWrap      = "giftWrap"
+	UpdateChangeAddress = "changeAddress"
+
+	// ActivityShipExpress is the express variant of the Ship step (also step index ShipStep).
+	ActivityShipExpress = "ShipExpress"
+
 	// ErrCardDeclined is a non-retryable application error type.
 	ErrCardDeclined = "CardDeclined"
 
@@ -28,6 +34,10 @@ const (
 	CompensationStep = 4
 	// ChargeStep is the index of the step that calls the Payments API.
 	ChargeStep = 1
+	// ShipStep is the index of the Ship order step.
+	ShipStep = 2
+	// ErrAlreadyShipped is the update rejection message once shipping has been recorded.
+	ErrAlreadyShipped = "already shipped"
 )
 
 // StepNames are the human labels shown on the worker to-do list, by step index.
@@ -70,7 +80,17 @@ type OrderInput struct {
 	StartToCloseMs int       `json:"startToCloseMs"`
 	HeartbeatMs    int       `json:"heartbeatMs"`
 	Retry          RetrySpec `json:"retry"`
+
+	// Idioms scenes.
+	NoIdempotencyKey  bool `json:"noIdempotencyKey"`
+	CourierWaitMs     int  `json:"courierWaitMs"`
+	ScheduleToCloseMs int  `json:"scheduleToCloseMs"`
+	LateAfterMs       int  `json:"lateAfterMs"`
 }
+
+// Build is the workflow build this worker process runs: "good" or "bad".
+// RunWorker sets it at boot from the controller's /internal/deploy.
+var Build = "good"
 
 // StepResult is returned by every activity.
 type StepResult struct {
@@ -79,15 +99,21 @@ type StepResult struct {
 
 // Progress is published as a workflow memo and returned by the progress query.
 type Progress struct {
-	Done        []int `json:"done"` // worker id per completed step, in order
-	Paused      bool  `json:"paused"`
-	Declined    bool  `json:"declined"`
-	Compensated bool  `json:"compensated"`
+	Done        []int  `json:"done"` // worker id per completed step, in order
+	Paused      bool   `json:"paused"`
+	Declined    bool   `json:"declined"`
+	Compensated bool   `json:"compensated"`
+	GiftWrap    bool   `json:"giftWrap"`
+	Address     string `json:"address"`
+	WaitUntil   int64  `json:"waitUntil"` // unix ms the courier timer ends; 0 when not waiting
+	Canceled    bool   `json:"canceled"`
+	Express     bool   `json:"express"`
+	GaveUp      string `json:"gaveUp"` // timeout type name, e.g. "ScheduleToClose"
 }
 
 // Event is pushed by workers to the controller for live progress.
 type Event struct {
-	Type       string `json:"type"` // "started" | "finished"
+	Type       string `json:"type"` // "started" | "finished" | "replayed"
 	WorkflowID string `json:"workflowId"`
 	Step       int    `json:"step"`
 	Attempt    int    `json:"attempt"`
@@ -95,6 +121,7 @@ type Event struct {
 	DurationMs int    `json:"durationMs"`
 	Error      string `json:"error,omitempty"`
 	ErrorType  string `json:"errorType,omitempty"`
+	Events     int64  `json:"events,omitempty"` // "replayed": history events replayed
 }
 
 // WorkerNames are the pet names of the four workers (index = worker id, 1-based).

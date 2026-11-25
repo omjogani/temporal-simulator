@@ -14,6 +14,10 @@ test("each event maps to the sound in the spec's effect table", () => {
     [{ kind: "duplicate", id: "a", client: 0 }, "buzz"],
     [{ kind: "charged", id: "a", client: 0 }, "coin"],
     [{ kind: "retry", id: "a", client: 0 }, null],
+    [{ kind: "orderCanceled", id: "a", client: 0 }, "pop"],
+    [{ kind: "stuck", id: "a", client: 0 }, "buzz"],
+    [{ kind: "replayed", worker: 1 }, "pop"],
+    [{ kind: "timeout", id: "a", client: 0, tag: "x" }, "buzz"],
   ];
   for (const [ev, name] of cases) expect(soundFor(ev)).toBe(name);
 });

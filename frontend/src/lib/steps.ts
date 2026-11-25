@@ -1,6 +1,26 @@
 import type { ActionId, ScoreKey, ToolId } from "./types";
 
+export type SwitchId = "idemKey" | "build";
+export type CodeAnchor = "reserve" | "charge" | "courier" | "ship" | "email" | "cleanup" | "signal" | "update" | "query" | "late";
+/** A short excerpt of backend/internal/orders (workflow, activities or worker code); anchors are 0-based indexes into `lines`. */
+export interface CodeSnippet {
+  lines: string[];
+  anchors: Partial<Record<CodeAnchor, number>>;
+}
+
+/** A tab of the toolbox: only the active section's buttons are shown (step 1, where there are many). */
+export interface StepSection {
+  id: string;
+  label: string;
+  tools?: ToolId[];
+  actions: ActionId[];
+}
+
 export interface StepConfig {
+  section: "steps";
+  rule?: string;
+  code?: CodeSnippet;
+  switches?: SwitchId[];
   id: number;
   act: 1 | 2;
   name: string;
@@ -10,12 +30,16 @@ export interface StepConfig {
   lanes: boolean;
   tools: ToolId[];
   actions: (ActionId | "sched")[];
+  /** Optional toolbox tabs. Every tool and action of the step belongs to exactly one. */
+  sections?: StepSection[];
   score: ScoreKey[];
-  tryThis: string;
+  /** One caption, or numbered beats for a longer story. */
+  tryThis: string | string[];
 }
 
 export const STEPS: StepConfig[] = [
   {
+    section: "steps",
     id: 1,
     act: 1,
     name: "Plain queue",
@@ -24,12 +48,24 @@ export const STEPS: StepConfig[] = [
     side: null,
     lanes: false,
     tools: ["hammer"],
-    actions: ["flood"],
-    score: ["done", "inflight", "lost"],
-    tryThis:
-      "Hammer a busy worker. The queue deleted that order when it handed it out, so it dies halfway: stock reserved, card charged, never shipped. Then hammer the queue: every waiting order is gone, and new orders fail for 10 s.",
+    actions: ["flood", "payDown", "paySlow", "declined", "ackMode", "dlq", "replayDlq", "bulkJob", "pauseAll"],
+    sections: [
+      { id: "crashes", label: "Crashes", tools: ["hammer"], actions: ["flood", "ackMode"] },
+      { id: "payments", label: "Payments", actions: ["payDown", "paySlow", "declined", "dlq", "replayDlq"] },
+      { id: "load", label: "Load", actions: ["bulkJob", "pauseAll"] },
+    ],
+    score: ["done", "inflight", "lost", "failed"],
+    tryThis: [
+      "Hammer a worker, then the queue: orders were deleted at hand-out.",
+      "Ack after processing: no loss, but a crash charges the card twice.",
+      "Payments down or declined: orders vanish, nothing retries or refunds.",
+      "Dead-letter queue: nothing vanishes, but someone must replay each order by hand.",
+      "Drop a Bulk job: every other order waits behind all 40.",
+      "Pause all: a queue can't pause mid-order, so the work is dropped.",
+    ],
   },
   {
+    section: "steps",
     id: 2,
     act: 2,
     name: "Durability",
@@ -44,6 +80,7 @@ export const STEPS: StepConfig[] = [
       "Hammer a worker mid-order: its ticks are kept and Temporal retries the step on a healthy worker. Hammer all workers, or hammer the Temporal Service itself, for 10 s. Everything waits, then continues. Lost stays at 0.",
   },
   {
+    section: "steps",
     id: 3,
     act: 2,
     name: "Timeouts & retries",
@@ -58,6 +95,7 @@ export const STEPS: StepConfig[] = [
       "Take Payments down for 10 s: Charge card retries after 1, 2, 4 and 8 s, with the retry timer held by Temporal, then succeeds once Payments is back. Make Payments slow: calls take 5 s, hit the 3 s timeout and retry. Send a declined card: it's non-retryable, so the order fails fast and releases its stock.",
   },
   {
+    section: "steps",
     id: 4,
     act: 2,
     name: "Priority & fairness",
@@ -72,6 +110,7 @@ export const STEPS: StepConfig[] = [
       "Pick a mode first, then send a bulk import from Client 4. FIFO: everyone waits behind it. Priority: Client 1 (VIP) jumps ahead. Fairness: every client gets its turn. Modes apply to orders placed after you switch.",
   },
   {
+    section: "steps",
     id: 5,
     act: 2,
     name: "Pause & resume",
@@ -90,12 +129,45 @@ export const STEPS: StepConfig[] = [
 /** The step's accent colour as a CSS value. */
 export const stepAccent = (id: number): string => `var(--c-step-${id})`;
 
+/** The caption as a list of lines: a plain string is a single line. */
+export const tryThisLines = (step: StepConfig): string[] => (Array.isArray(step.tryThis) ? step.tryThis : [step.tryThis]);
+
+/** The toolbox tab a tool or action lives in, if the step has tabs (so a hotkey can reveal its button). */
+export const sectionOf = (step: StepConfig, item: ToolId | ActionId | "sched"): string | undefined =>
+  step.sections?.find((s) => [...(s.tools ?? []), ...s.actions].includes(item as never))?.id;
+
+/** The hotkeys of a tab's buttons (tools first), for the hint that shows keys of the tabs you are not on. */
+export const sectionKeys = (step: StepConfig, id: string): string[] => {
+  const s = step.sections?.find((x) => x.id === id);
+  if (!s) return [];
+  const keys = [...(s.tools ?? []).map((t) => TOOL_META[t].key), ...s.actions.map((a) => ACTION_META[a].key)];
+  return keys.filter((k): k is string => !!k);
+};
+
+export const routeFor = (cfg: StepConfig): string => `/${cfg.id}`;
+
+/** Routes of the previous and next step (← → keys). */
+export function neighbours(cfg: StepConfig): { prev?: string; next?: string } {
+  const i = STEPS.findIndex((s) => s.id === cfg.id);
+  return {
+    prev: i > 0 ? routeFor(STEPS[i - 1]) : undefined,
+    next: i >= 0 && i < STEPS.length - 1 ? routeFor(STEPS[i + 1]) : undefined,
+  };
+}
+
 export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
 
 /** Tools are icon tiles; `icon` names an icon in components/atoms/icons.tsx (TOOL_ICONS). */
 export const TOOL_META: Record<ToolId, { label: string; short: string; key: string; icon: ToolId }> = {
   hammer: { label: "Hammer", short: "Hammer", key: "H", icon: "hammer" },
   pause: { label: "Pause workflow", short: "Pause", key: "P", icon: "pause" },
+  select: { label: "Select", short: "Select", key: "V", icon: "select" },
+  error: { label: "Inject error", short: "Error", key: "E", icon: "error" },
+  signal: { label: "Signal", short: "Signal", key: "G", icon: "signal" },
+  query: { label: "Query", short: "Query", key: "Q", icon: "query" },
+  update: { label: "Update", short: "Update", key: "U", icon: "update" },
+  cancel: { label: "Cancel", short: "Cancel", key: "X", icon: "cancel" },
+  freeze: { label: "Freeze a pet", short: "Freeze", key: "C", icon: "freeze" },
 };
 
 export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
@@ -105,7 +177,12 @@ export const ACTION_META: Record<ActionId, { label: string; key?: string }> = {
   declined: { label: "Declined card", key: "D" },
   payDown: { label: "⚡ Payments down", key: "Z" },
   paySlow: { label: "🐌 Payments slow", key: "S" },
+  payDownLong: { label: "⚡ Payments down 20 s", key: "L" },
   pauseAll: { label: "Pause all" },
+  ackMode: { label: "Ack after processing", key: "K" },
+  dlq: { label: "Dead-letter queue", key: "Q" },
+  replayDlq: { label: "Replay DLQ", key: "Y" },
+  bulkJob: { label: "Bulk job ×40", key: "B" },
   resumeAll: { label: "Resume all" },
   reset: { label: "Reset", key: "R" },
 };
@@ -117,6 +194,8 @@ export const SCORE_META: Record<ScoreKey, { label: string; tone: "good" | "bad" 
   dup: { label: "Duplicate charges", tone: "bad" },
   failed: { label: "Failed cleanly", tone: "gold" },
   paused: { label: "Paused", tone: "gold" },
+  canceled: { label: "Canceled", tone: "neutral" },
+  dlq: { label: "In DLQ", tone: "gold" },
 };
 
 /** Worker pet names (index = worker id - 1). Must match backend/internal/orders WorkerNames. */

@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
-import { stepAccent, type StepConfig } from "@/lib/steps";
+import { stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
 import styles from "./ScenarioMenu.module.css";
 
 interface Props {
@@ -100,7 +100,7 @@ export function ScenarioMenu({ steps, selected, onSelect, onStart }: Props) {
               id={`cart-${s.id}`}
               role="option"
               aria-selected={i === selected}
-              aria-label={`${s.id}. ${s.name}`}
+              aria-label={s.id >= 100 ? s.name : `${s.id}. ${s.name}`}
               className={styles.cart}
               style={fanStyle(i - selected)}
               onClick={() => (i === selected ? onStart(s.id) : onSelect(i))}
@@ -114,7 +114,7 @@ export function ScenarioMenu({ steps, selected, onSelect, onStart }: Props) {
         </button>
       </div>
 
-      <p className={styles.blurb}>{step.tryThis}</p>
+      <p className={styles.blurb}>{tryThisLines(step).join(" ")}</p>
       <button type="button" className={styles.start} onClick={() => onStart(step.id)}>
         ▶ Start <kbd>Enter</kbd>
       </button>

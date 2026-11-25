@@ -56,4 +56,35 @@ describe("diffViews", () => {
       expect(diffViews(prev, next)).toEqual([]);
     }
   });
+
+  test("canceled, stuck, timeout and replayed each emit once across identical follow-up views", () => {
+    const a0 = dot("a", { client: 1 });
+    const cases: [ReturnType<typeof dot>, ReturnType<typeof dot>, object][] = [
+      [a0, dot("a", { client: 1, fate: "canceled" }), { kind: "orderCanceled", id: "a", client: 1 }],
+      [a0, dot("a", { client: 1, ring: "stuck" }), { kind: "stuck", id: "a", client: 1 }],
+      [a0, dot("a", { client: 1, tag: "heartbeat ⏱" }), { kind: "timeout", id: "a", client: 1, tag: "heartbeat ⏱" }],
+    ];
+    for (const [from, to, ev] of cases) {
+      const v1 = view({ dots: [to] });
+      expect(diffViews(view({ dots: [from] }), v1)).toEqual([ev]);
+      expect(diffViews(v1, view({ dots: [to] }))).toEqual([]);
+    }
+    const r0 = view();
+    const r1 = view();
+    r1.workers[1] = { ...r1.workers[1], replayed: { events: 12, ago: 0 } };
+    const r2 = view();
+    r2.workers[1] = { ...r2.workers[1], replayed: { events: 12, ago: 1000 } };
+    expect(diffViews(r0, r1)).toEqual([{ kind: "replayed", worker: 2 }]);
+    expect(diffViews(r1, r2)).toEqual([]);
+    expect(diffViews(r2, r2)).toEqual([]);
+  });
+
+  test("a changed tag does not re-fire and hidden/ghost dots stay quiet for the new kinds", () => {
+    const t = dot("a", { tag: "x" });
+    expect(diffViews(view({ dots: [t] }), view({ dots: [dot("a", { tag: "y" })] }))).toEqual([]);
+    for (const extra of [{ hidden: true }, { ghost: true }]) {
+      const next = view({ dots: [dot("a", { ...extra, ring: "stuck", tag: "x", fate: "canceled" })] });
+      expect(diffViews(view({ dots: [dot("a", extra)] }), next)).toEqual([]);
+    }
+  });
 });

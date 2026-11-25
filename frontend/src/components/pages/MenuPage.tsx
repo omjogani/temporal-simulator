@@ -19,7 +19,8 @@ export function MenuPage() {
       else if (e.key === "Enter") {
         if (e.target instanceof HTMLButtonElement) return; // the focused button handles it
         router.push(`/${STEPS[selected].id}`);
-      } else if (/^[1-9]$/.test(e.key) && STEPS.some((s) => s.id === Number(e.key))) router.push(`/${e.key}`);
+      }
+      else if (/^[1-9]$/.test(e.key) && STEPS.some((s) => s.id === Number(e.key))) router.push(`/${e.key}`);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

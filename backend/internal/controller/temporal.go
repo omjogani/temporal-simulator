@@ -157,6 +157,13 @@ func (c *Controller) applyExecution(id string, status enumspb.WorkflowExecutionS
 			o.ensureCompensation()
 			o.Steps[orders.CompensationStep].State = stDone
 		}
+		o.GiftWrap = p.GiftWrap
+		o.Address = p.Address
+		o.WaitUntil = p.WaitUntil
+		o.Express = p.Express
+		if p.GaveUp != "" { // otherwise describeOne owns Timeout; an empty memo must not blank its label
+			o.Timeout = p.GaveUp
+		}
 		if p.Paused && (o.Status == osQueued || o.Status == osFinishing) {
 			o.Status = osPaused
 			o.PauseRequested = false
@@ -183,7 +190,12 @@ func (c *Controller) applyExecution(id string, status enumspb.WorkflowExecutionS
 		o.EndedAt = unixMs(now)
 		o.Worker = -1
 		c.stats.Failed++
-	case enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED, enumspb.WORKFLOW_EXECUTION_STATUS_TIMED_OUT, enumspb.WORKFLOW_EXECUTION_STATUS_CANCELED:
+	case enumspb.WORKFLOW_EXECUTION_STATUS_CANCELED:
+		o.Status = osCanceled
+		o.EndedAt = unixMs(now)
+		o.Worker = -1
+		c.stats.Canceled++
+	case enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED, enumspb.WORKFLOW_EXECUTION_STATUS_TIMED_OUT:
 		o.Status = osLost
 		o.EndedAt = unixMs(now)
 		c.stats.Lost++
@@ -295,12 +307,16 @@ func (c *Controller) starterLoop(ctx context.Context) {
 		}
 		step := c.step
 		actMs, stcMs := c.scaled(step.ActivityMs), c.scaled(step.StartToCloseMs)
+		courierMs := c.scaled(step.CourierWaitMs)
+		noIdem := !c.idemKey
 		c.mu.Unlock()
 
 		for _, o := range pending {
 			in := orders.OrderInput{
 				OrderID: o.ID, Num: o.Num, Client: o.Client, Declined: o.Declined,
 				ActivityMs: actMs, StartToCloseMs: stcMs, HeartbeatMs: step.HeartbeatMs, Retry: step.Retry,
+				NoIdempotencyKey: noIdem, CourierWaitMs: courierMs,
+				ScheduleToCloseMs: step.ScheduleToCloseMs, LateAfterMs: courierMs / 2,
 			}
 			sctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			_, err := c.tc.ExecuteWorkflow(sctx, client.StartWorkflowOptions{

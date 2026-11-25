@@ -36,6 +36,7 @@
   --c-step-3: #e9c04f;
   --c-step-4: #5ea2f0;
   --c-step-5: #a07cf0;
+  --c-idioms: #f08a4b;
   --c-accent: var(--c-ok); /* set per step on the arena */
 
   /* glass panels over the illustrated stage */

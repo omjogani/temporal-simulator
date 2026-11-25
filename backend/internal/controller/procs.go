@@ -18,6 +18,10 @@ type workerProc struct {
 	gen       int // bumps on every start/kill so stale callbacks can tell
 	downUntil time.Time
 	completed int
+	frozen    bool // docker pause in progress; downUntil is when it ends
+
+	replayedAt     int64
+	replayedEvents int64
 }
 
 func containerOf(id int) string { return orders.ContainerName(id) }
@@ -44,6 +48,8 @@ func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 		c.mu.Unlock()
 		return false
 	}
+	wasFrozen := w.frozen
+	w.frozen = false
 	w.up = false
 	w.gen++
 	gen := w.gen
@@ -53,6 +59,9 @@ func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 	}
 	c.mu.Unlock()
 
+	if wasFrozen {
+		_ = docker("unpause", containerOf(id)) // a paused container cannot be killed
+	}
 	if err := docker("kill", containerOf(id)); err != nil {
 		log.Printf("kill %s: %v", containerOf(id), err)
 	}
@@ -68,6 +77,72 @@ func (c *Controller) killWorker(id int, downFor time.Duration) bool {
 		})
 	}
 	return true
+}
+
+// freezeWorker runs `docker pause` on the worker's container and `docker unpause`
+// after HammerDuration. The process stays alive but gets no CPU, so its heartbeats stop.
+func (c *Controller) freezeWorker(id int) bool {
+	if id < 1 || id > numWorkers {
+		return false
+	}
+	c.mu.Lock()
+	w := c.workers[id]
+	if !w.up || w.frozen {
+		c.mu.Unlock()
+		return false
+	}
+	until := time.Now().Add(HammerDuration)
+	w.frozen, w.downUntil = true, until
+	c.say("docker pause %s: %s is frozen for 10 s. The process is alive but silent.", containerOf(id), orders.WorkerName(id))
+	c.mu.Unlock()
+
+	if err := docker("pause", containerOf(id)); err != nil {
+		log.Printf("pause %s: %v", containerOf(id), err)
+	}
+	// An unpauseAll or kill may have run while docker pause was in flight; undo the late pause.
+	c.mu.Lock()
+	late := !w.frozen || !w.downUntil.Equal(until)
+	c.mu.Unlock()
+	if late {
+		_ = docker("unpause", containerOf(id))
+	}
+	time.AfterFunc(HammerDuration, func() {
+		c.mu.Lock()
+		stale := !w.frozen || !w.downUntil.Equal(until) // thawed by a step change or killed meanwhile
+		if !stale {
+			w.frozen, w.downUntil = false, time.Time{}
+		}
+		c.mu.Unlock()
+		if !stale {
+			if err := docker("unpause", containerOf(id)); err != nil {
+				log.Printf("unpause %s: %v", containerOf(id), err)
+			}
+		}
+	})
+	return true
+}
+
+// takeFrozen clears the frozen flag of every worker and returns their ids.
+func (c *Controller) takeFrozen() []int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var ids []int
+	for i := 1; i <= numWorkers; i++ {
+		if w := c.workers[i]; w.frozen {
+			w.frozen, w.downUntil = false, time.Time{}
+			ids = append(ids, i)
+		}
+	}
+	return ids
+}
+
+// unpauseAll unfreezes every frozen worker, so a restart never meets a paused container.
+func (c *Controller) unpauseAll() {
+	for _, id := range c.takeFrozen() {
+		if err := docker("unpause", containerOf(id)); err != nil {
+			log.Printf("unpause %s: %v", containerOf(id), err)
+		}
+	}
 }
 
 // restartAllWorkers gives every worker a fresh process (empty workflow cache)
@@ -111,6 +186,13 @@ func (c *Controller) dockerWatchLoop(stop <-chan struct{}) {
 			return
 		case <-t.C:
 		}
+		// A kill or restart that lands while docker inspect runs makes its answer stale.
+		var gens [numWorkers + 1]int
+		c.mu.Lock()
+		for i := 1; i <= numWorkers; i++ {
+			gens[i] = c.workers[i].gen
+		}
+		c.mu.Unlock()
 		args := append([]string{"inspect", "-f", "{{.Name}} {{.State.Running}}"}, names...)
 		out, _ := exec.Command("docker", args...).Output()
 		running := map[string]bool{}
@@ -124,7 +206,7 @@ func (c *Controller) dockerWatchLoop(stop <-chan struct{}) {
 		for i := 1; i <= numWorkers; i++ {
 			w := c.workers[i]
 			r, known := running[containerOf(i)]
-			if !known {
+			if !known || w.gen != gens[i] {
 				continue
 			}
 			switch {

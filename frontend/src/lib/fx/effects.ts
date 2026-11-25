@@ -5,7 +5,7 @@ import type { PlacedDot } from "../motion/useDotMotion";
 import type { NodeId } from "../types";
 import type { FxEvent } from "./events";
 
-export type EffectKind = "tap" | "impact" | "confetti" | "poof" | "coin" | "spark" | "shake";
+export type EffectKind = "tap" | "impact" | "confetti" | "poof" | "coin" | "spark" | "shake" | "label";
 
 export interface Effect {
   id: number;
@@ -18,6 +18,8 @@ export interface Effect {
   color: string;
   /** 1 = normal, 2 = the Temporal Service itself. */
   power: number;
+  /** The words a "label" effect shows. */
+  text?: string;
 }
 
 /** A point in board units. (geometry.ts has its own tuple `Pt` for wire paths.) */
@@ -34,6 +36,7 @@ export const EFFECT_TTL: Record<EffectKind, number> = {
   coin: 600,
   spark: 500,
   shake: 300,
+  label: 900,
 };
 
 export const MAX_EFFECTS = 60;
@@ -46,6 +49,7 @@ export function anchor(ev: FxEvent, placed: PlacedDot[]): XY | null {
   switch (ev.kind) {
     case "workerDown":
     case "workerUp":
+    case "replayed":
       return workerXY(ev.worker);
     case "hubDown":
     case "hubUp":
@@ -58,7 +62,7 @@ export function anchor(ev: FxEvent, placed: PlacedDot[]): XY | null {
 }
 
 /** Where a click on a board node shows its tap ring. */
-export function nodeAnchor(node: NodeId): XY | null {
+export function nodeAnchor(node: NodeId, placed: PlacedDot[] = []): XY | null {
   if (node === "hub") return HUB_XY;
   if (node === "side") return { x: SIDE.x, y: SIDE.y };
   if (node.startsWith("w:")) return workerXY(Number(node.slice(2)));
@@ -66,13 +70,17 @@ export function nodeAnchor(node: NodeId): XY | null {
     const c = CLIENTS[Number(node.slice(2))];
     return c ? { x: c.x, y: c.y } : null;
   }
+  if (node.startsWith("o:")) {
+    const p = placed.find((d) => d.dot.id === node.slice(2));
+    return p ? { x: p.x, y: p.y } : null;
+  }
   return null;
 }
 
 let nextId = 1;
 
-function make(kind: EffectKind, at: XY, now: number, color: string, power = 1): Effect {
-  return { id: nextId++, kind, x: at.x, y: at.y, bornAt: now, ttl: EFFECT_TTL[kind], color, power };
+function make(kind: EffectKind, at: XY, now: number, color: string, power = 1, text?: string): Effect {
+  return { id: nextId++, kind, x: at.x, y: at.y, bornAt: now, ttl: EFFECT_TTL[kind], color, power, ...(text ? { text } : {}) };
 }
 
 /** A tap ring where the presenter clicked. */
@@ -95,6 +103,14 @@ export function spawn(ev: FxEvent, at: XY, now: number): Effect[] {
       return [make("poof", at, now, "var(--c-dim)")];
     case "orderFailed":
       return [make("poof", at, now, "var(--c-fault)")];
+    case "orderCanceled":
+      return [make("poof", at, now, "var(--c-dim)")];
+    case "stuck":
+      return [make("shake", at, now, "", 1), make("spark", at, now, "var(--c-fault)")];
+    case "replayed":
+      return [make("label", at, now, "var(--c-gold)", 1, "↻")];
+    case "timeout":
+      return [make("label", at, now, "var(--c-gold)", 1, ev.tag)];
     case "charged":
       return [make("coin", at, now, "var(--c-gold)")];
     case "duplicate":

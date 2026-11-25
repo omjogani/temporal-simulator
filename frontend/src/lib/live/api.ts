@@ -15,12 +15,59 @@ async function post(path: string, body: unknown = {}) {
   }
 }
 
+export type OpId = "signal" | "query" | "update" | "cancel" | "inject";
+export interface OpReply {
+  ok: boolean;
+  text: string;
+  tone: "good" | "bad" | "gold" | "dim";
+}
+export interface HistEvent {
+  id: number;
+  kind: string;
+  label: string;
+  worker: number;
+  t: number;
+}
+
+const UNREACHABLE: OpReply = { ok: false, text: "Controller unreachable, try again", tone: "gold" };
+const CONTROLLER_ERROR: OpReply = { ok: false, text: "Controller error, try again", tone: "gold" };
+
+async function order(id: string, op: OpId, arg = ""): Promise<OpReply> {
+  try {
+    const res = await fetch(CONTROLLER_URL + "/api/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, op, arg }),
+    });
+    if (!res.ok) return CONTROLLER_ERROR;
+    return (await res.json()) as OpReply;
+  } catch {
+    return UNREACHABLE;
+  }
+}
+
+/** The order's history, or null when the controller errors, is unreachable or sends something else. */
+async function history(id: string): Promise<HistEvent[] | null> {
+  try {
+    const res = await fetch(`${CONTROLLER_URL}/api/history?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    return Array.isArray(body) ? (body as HistEvent[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const api = {
+  order,
+  history,
+  scene: (s: { idemKey?: boolean; build?: string }) => post("/api/scene", s),
+  freeze: (worker: number) => post("/api/freeze", { worker }),
   step: (step: number, force = false) => post("/api/step", { step, force }),
   hammerWorker: (worker: number) => post("/api/hammer", { target: "worker", worker }),
   hammerWorkers: () => post("/api/hammer", { target: "workers" }),
   hammerTemporal: () => post("/api/hammer", { target: "temporal" }),
-  payments: (mode: "down" | "slow") => post("/api/payments", { mode }),
+  payments: (mode: "down" | "slow" | "downLong") => post("/api/payments", { mode }),
   load: (kind: "flood" | "bulk" | "declined") => post("/api/load", { kind }),
   sched: (mode: "fifo" | "priority" | "fair") => post("/api/sched", { mode }),
   speed: (speed: number) => post("/api/speed", { speed }),
