@@ -15,7 +15,7 @@ import { useDotMotion } from "@/lib/motion/useDotMotion";
 import { QueueSim } from "@/lib/sim/engine";
 import { toggleCodeOpen } from "@/lib/codeOpen";
 import { IDIOMS, neighbours } from "@/lib/idioms";
-import { stepAccent, workerName, type StepConfig } from "@/lib/steps";
+import { stepAccent, tryThisLines, workerName, type StepConfig } from "@/lib/steps";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
 import { FxCanvas } from "@/components/organisms/board/FxCanvas";
 import { ToolCursor } from "@/components/organisms/board/ToolCursor";
@@ -43,7 +43,13 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
   // Act 1: one simulation per step (the page is keyed by step); Reset swaps it.
-  const newSim = () => (step.live ? null : new QueueSim({ score: step.score, hub: step.hub }));
+  // Act 1 starts playing so the board is never empty on stage; Reset starts a fresh playing sim.
+  const newSim = () => {
+    if (step.live) return null;
+    const s = new QueueSim({ score: step.score, hub: step.hub });
+    s.setRunning(true);
+    return s;
+  };
   const [sim, setSim] = useState<QueueSim | null>(newSim);
 
   // Act 2: live snapshots from the Go controller (real Temporal).
@@ -168,7 +174,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
 
   const setSched = (m: SchedMode) => void api.sched(m);
 
-  // Play / pause: clients only place orders while playing. Every step loads paused.
+  // Play / pause: clients only place orders while playing. Live steps load paused; Act 1 autoplays.
   const playing = step.live ? Boolean(live.snapshot?.running) : Boolean(sim?.running);
   const togglePlay = () => {
     if (step.live) void api.run(!playing);
@@ -292,7 +298,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
       }
       right={idiom && step.code ? <CodePanel rule={step.rule ?? ""} panels={view.panels} /> : <OrdersPanel panels={view.panels} />}
       strip={idiom ? <HistoryStrip orderId={selected} replayedBy={replayer ? workerName(replayer.id) : undefined} replayedAt={replayer ? live.snapshot?.workers.find((w) => w.id === replayer.id)?.replayedAt : undefined} /> : undefined}
-      caption={<TryThis text={step.tryThis} />}
+      caption={<TryThis lines={tryThisLines(step)} />}
       banner={<BannerLine text={bannerText} />}
     />
   );

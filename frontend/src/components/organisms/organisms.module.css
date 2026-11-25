@@ -89,6 +89,13 @@
   gap: 12px;
   align-items: baseline;
 }
+.beats {
+  margin: 0;
+  padding-left: 1.3em;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 4px 24px;
+}
 .caption .lbl {
   font: 500 10px / 1 var(--font-mono);
   letter-spacing: 0.1em;

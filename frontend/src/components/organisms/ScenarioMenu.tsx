@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { SceneBackdrop } from "@/components/organisms/board/SceneBackdrop";
-import { stepAccent, type StepConfig } from "@/lib/steps";
+import { stepAccent, tryThisLines, type StepConfig } from "@/lib/steps";
 import styles from "./ScenarioMenu.module.css";
 
 interface Props {
@@ -114,7 +114,7 @@ export function ScenarioMenu({ steps, selected, onSelect, onStart }: Props) {
         </button>
       </div>
 
-      <p className={styles.blurb}>{step.tryThis}</p>
+      <p className={styles.blurb}>{tryThisLines(step).join(" ")}</p>
       <button type="button" className={styles.start} onClick={() => onStart(step.id)}>
         ▶ Start <kbd>Enter</kbd>
       </button>

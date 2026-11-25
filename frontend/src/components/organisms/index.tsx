@@ -152,11 +152,19 @@ export function StepNav({ config }: { config: StepConfig }) {
   );
 }
 
-export function TryThis({ text }: { text: string }) {
+export function TryThis({ lines }: { lines: string[] }) {
   return (
     <div className={styles.caption}>
       <span className={styles.lbl}>Try this</span>
-      <span>{text}</span>
+      {lines.length > 1 ? (
+        <ol className={styles.beats}>
+          {lines.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ol>
+      ) : (
+        <span>{lines[0]}</span>
+      )}
     </div>
   );
 }

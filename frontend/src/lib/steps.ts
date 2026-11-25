@@ -23,7 +23,8 @@ export interface StepConfig {
   tools: ToolId[];
   actions: (ActionId | "sched")[];
   score: ScoreKey[];
-  tryThis: string;
+  /** One caption, or numbered beats for a longer story. */
+  tryThis: string | string[];
 }
 
 export const STEPS: StepConfig[] = [
@@ -39,8 +40,13 @@ export const STEPS: StepConfig[] = [
     tools: ["hammer"],
     actions: ["flood", "payDown", "paySlow", "declined", "ackMode", "bulkJob", "pauseAll"],
     score: ["done", "inflight", "lost", "failed"],
-    tryThis:
-      "Hammer a busy worker. The queue deleted that order when it handed it out, so it dies halfway: stock reserved, card charged, never shipped. Then hammer the queue: every waiting order is gone, and new orders fail for 10 s.",
+    tryThis: [
+      "Hammer a worker, then the queue: orders were deleted at hand-out.",
+      "Ack after processing: no loss, but a crash charges the card twice.",
+      "Payments down or declined: orders vanish, nothing retries or refunds.",
+      "Drop a Bulk job: the VIP order waits behind all 40.",
+      "Pause all: a queue can't pause mid-order, so the work is dropped.",
+    ],
   },
   {
     section: "steps",
@@ -106,6 +112,9 @@ export const STEPS: StepConfig[] = [
 
 /** The step's accent colour as a CSS value. */
 export const stepAccent = (id: number): string => (id >= 100 ? "var(--c-idioms)" : `var(--c-step-${id})`);
+
+/** The caption as a list of lines: a plain string is a single line. */
+export const tryThisLines = (step: StepConfig): string[] => (Array.isArray(step.tryThis) ? step.tryThis : [step.tryThis]);
 
 export const getStep =(id: number): StepConfig | undefined => STEPS.find((s) => s.id === id);
 
