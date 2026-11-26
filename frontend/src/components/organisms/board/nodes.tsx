@@ -35,7 +35,7 @@ export function Hit({ node, label, onHit, children }: { node: NodeId; label: str
 
 export function ClientNode({ index, wide, onHit }: { index: number; wide: boolean; onHit: (n: NodeId) => void }) {
   const c = CLIENTS[index];
-  const suffix = wide ? (index === 0 ? " · VIP" : index === 3 ? " · bulk" : "") : "";
+  const suffix = wide ? (index <= 1 ? " · VIP" : "") : "";
   return (
     <Hit node={`c:${index}`} label={`Client ${index + 1}`} onHit={onHit}>
       <Kiosk x={c.x} y={c.y} w={wide ? 150 : 110} color={clientColor(index)} label={`Client ${index + 1}${suffix}`} />

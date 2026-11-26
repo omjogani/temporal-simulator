@@ -107,7 +107,7 @@ export const STEPS: StepConfig[] = [
     actions: ["bulk", "sched"],
     score: ["done", "inflight", "lost"],
     tryThis:
-      "Pick a mode first, then send a bulk import from Client 4. FIFO: everyone waits behind it. Priority: Client 1 (VIP) jumps ahead. Fairness: every client gets its turn. Modes apply to orders placed after you switch.",
+      "Pick a mode first, then send a bulk import from Client 1. FIFO: everyone waits behind it. Priority: Clients 1 and 2 (VIP) go first, but Client 2 is stuck behind Client 1's bulk. Fairness: the two VIPs take turns; Clients 3 and 4 still wait. Modes apply to orders placed after you switch.",
   },
   {
     section: "steps",

@@ -270,19 +270,28 @@ func (c *Controller) NewOrder(client int, declined bool) {
 	c.num++
 	id := fmt.Sprintf("order-%s-%d", c.session, c.num)
 	o := newOrder(id, c.num, client, declined)
+	// Clients 1 and 2 are the VIPs (PriorityKey 1); 3 and 4 run after them (3).
+	// Fairness keeps those priorities and adds one FairnessKey per client, so
+	// the two VIPs take turns instead of queueing FIFO behind each other.
+	vip := client == 0 || client == 1
 	switch c.sched {
 	case "priority":
-		o.priority = temporal.Priority{PriorityKey: 3}
-		if client == 0 {
-			o.priority.PriorityKey = 1
-		}
+		o.priority = temporal.Priority{PriorityKey: priorityFor(vip)}
 	case "fair":
-		o.priority = temporal.Priority{FairnessKey: fmt.Sprintf("client-%d", client+1), FairnessWeight: 1}
+		o.priority = temporal.Priority{PriorityKey: priorityFor(vip), FairnessKey: fmt.Sprintf("client-%d", client+1), FairnessWeight: 1}
 	}
 	c.orders[id] = o
 	c.order = append(c.order, o)
 	c.mu.Unlock()
 	c.kickStarter()
+}
+
+// priorityFor returns the PriorityKey for an order: 1 for the VIP clients, 3 for the rest. Lower runs first.
+func priorityFor(vip bool) int {
+	if vip {
+		return 1
+	}
+	return 3
 }
 
 // starterLoop starts holding orders in order. While Temporal is down the

@@ -1,5 +1,5 @@
 # Dynamic config for the simulator's Temporal server.
-# Task queue priority and fairness (used on step /5).
+# Task queue priority and fairness (used on step /4).
 matching.useNewMatcher:
   - value: true
 matching.enableFairness:

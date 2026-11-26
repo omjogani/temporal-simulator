@@ -243,12 +243,12 @@ describe("dead-letter queue", () => {
     expect(score(sim, "done")).toBe(29);
   });
 
-  test("with the DLQ off nothing is parked and no DLQ box is shown", () => {
+  test("with the DLQ off nothing is parked and the DLQ box stays empty", () => {
     const sim = newSim();
     sim.payments("declined");
     sim.flood();
     runFor(sim, 60_000);
-    expect(sim.view().side).toBeNull();
+    expect(sim.view().side).toMatchObject({ kind: "dlq", count: 0, chips: [] });
     expect(score(sim, "lost")).toBe(1);
   });
 

@@ -80,7 +80,7 @@ frontend/                 Next.js (App Router, TypeScript), atomic design
 - The step 1 toolbox has tabs (`sections` in `lib/steps.ts`): Crashes, Payments, Load. Only the active
   tab's buttons show; every hotkey still works and switches to its tab. Replay DLQ only shows once
   something is parked. Steps 2-5 have no tabs.
-- Act 1 starts playing on load and on Reset. `tryThis` can be a list of numbered beats.
+- Act 1 loads paused, like steps 2-5: the presenter starts it with Play (Space). Reset also leaves it paused. `tryThis` can be a list of numbered beats.
 
 ## Idioms backend (no frontend)
 

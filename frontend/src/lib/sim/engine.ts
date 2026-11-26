@@ -431,7 +431,8 @@ export class QueueSim {
       },
       payments:
         this.payFault && now < this.payFault.until ? { state: this.payFault.mode, leftMs: this.payFault.until - now } : { state: "ok", leftMs: 0 },
-      side: this.dlqOn || this.dlq.length ? { kind: "dlq", count: this.dlq.length, chips: this.dlq.map((o) => ({ id: o.id, label: `#${o.num}`, client: o.client })) } : null,
+      // The DLQ shelf is always on the board so it can be talked about; it only fills once the DLQ is switched on.
+      side: { kind: "dlq", count: this.dlq.length, chips: this.dlq.map((o) => ({ id: o.id, label: `#${o.num}`, client: o.client })) },
       workers,
       dots,
       panels: {

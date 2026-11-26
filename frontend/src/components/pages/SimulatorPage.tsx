@@ -41,13 +41,8 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
   const [banner, setBanner] = useState({ seq: -1, at: 0 });
 
   // Act 1: one simulation per step (the page is keyed by step); Reset swaps it.
-  // Act 1 starts playing so the board is never empty on stage; Reset starts a fresh playing sim.
-  const newSim = () => {
-    if (step.live) return null;
-    const s = new QueueSim({ score: step.score, hub: step.hub });
-    s.setRunning(true);
-    return s;
-  };
+  // Act 1 loads paused, like the live steps, so the presenter starts it with Play; Reset also starts paused.
+  const newSim = () => (step.live ? null : new QueueSim({ score: step.score, hub: step.hub }));
   const [sim, setSim] = useState<QueueSim | null>(newSim);
 
   // Act 2: live snapshots from the Go controller (real Temporal).
@@ -181,7 +176,7 @@ export function SimulatorPage({ config }: { config: StepConfig }) {
 
   const setSched = (m: SchedMode) => void api.sched(m);
 
-  // Play / pause: clients only place orders while playing. Live steps load paused; Act 1 autoplays.
+  // Play / pause: clients only place orders while playing. Every step loads paused.
   const playing = step.live ? Boolean(live.snapshot?.running) : Boolean(sim?.running);
   const togglePlay = () => {
     if (step.live) void api.run(!playing);

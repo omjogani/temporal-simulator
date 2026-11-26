@@ -218,10 +218,10 @@ func (c *Controller) Load(kind string) {
 		c.mu.Unlock()
 	case "bulk":
 		for i := 0; i < 40; i++ {
-			c.NewOrder(3, false)
+			c.NewOrder(0, false)
 		}
 		c.mu.Lock()
-		c.say("Client 4 sends a bulk import of 40 orders.")
+		c.say("Client 1 (VIP) sends a bulk import of 40 orders.")
 		c.mu.Unlock()
 	case "declined":
 		c.NewOrder(0, true)
@@ -239,9 +239,9 @@ func (c *Controller) SetSched(mode string) {
 	case "fifo":
 		c.say("FIFO: no priority or fairness keys. First in, first out.")
 	case "priority":
-		c.say("Priority: Client 1 orders start with PriorityKey 1, everyone else 3. Lower runs first.")
+		c.say("Priority: Clients 1 and 2 (VIP) get PriorityKey 1, Clients 3 and 4 get 3. Lower runs first; same priority is still FIFO.")
 	case "fair":
-		c.say("Fairness: each client's orders get their own FairnessKey, so workers take turns between clients.")
+		c.say("Priority + fairness: same priorities, plus a FairnessKey per client, so the two VIPs take turns within priority 1.")
 	default:
 		return
 	}

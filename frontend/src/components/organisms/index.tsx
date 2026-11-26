@@ -130,7 +130,7 @@ export function Toolbox({ step, tool, sched, payments, ackAfter, dlqOn, dlqParke
             options={[
               { value: "fifo", label: "FIFO" },
               { value: "priority", label: "Priority" },
-              { value: "fair", label: "Fairness" },
+              { value: "fair", label: "Priority + Fairness" },
             ]}
           />
         ) : (
